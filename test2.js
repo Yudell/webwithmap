@@ -218,9 +218,9 @@ function generateRivers(map, heightMap, averageRiverLength) {
   });
 }
 
-const mapWidth = 500;
-const mapHeight = 500;
-const cellSize = 1;
+const mapWidth = 250;
+const mapHeight = 125;
+const cellSize = 3;
 
 const terrainSeed = generateRandomSeed();
 const variantSeed = generateRandomSeed();
