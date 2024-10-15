@@ -1,16 +1,5 @@
-const { makeNoise2D } = require('open-simplex-noise');
+import { makeNoise2D } from 'open-simplex-noise';
 
-// чёткость
-const defaultOctaves = 100;
-// раздробленность островов
-const defaultFrequency = 0.2;
-// мягкость рельефа
-//const defaultPersistence = 0.65;
-
-//const defaultFrequency = Math.random() * (0.75 - 0.2) + 0.2;
-const defaultPersistence = Math.random() * (0.65 - 0.6) + 0.6;
-
-// Функция для генерации случайного сида
 function generateRandomSeed() {
   return Math.floor(Math.random() * Math.pow(2, 32));
 }
@@ -44,7 +33,11 @@ function newFractalNoise(info) {
   };
 }
 
-module.exports = {
+const defaultOctaves = 100;
+const defaultFrequency = 0.2;
+const defaultPersistence = 0.65;
+
+export {
   createNoise,
   newFractalNoise,
   defaultOctaves,
