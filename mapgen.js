@@ -33,7 +33,7 @@ function newFractalNoise(info) {
   };
 }
 
-const defaultOctaves = 50;
+const defaultOctaves = 10;
 const defaultFrequency = 0.2;
 const defaultPersistence = 0.65;
 

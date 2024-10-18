@@ -85,6 +85,7 @@ function generateMap(width, height, terrainNoise, variantNoise, biomeNoise) {
 }
 
 function drawMap(map, cellSize) {
+  console.log('Drawing map...');
   const canvas = document.getElementById('map-canvas');
   canvas.width = map[0].length * cellSize;
   canvas.height = map.length * cellSize;
@@ -92,6 +93,9 @@ function drawMap(map, cellSize) {
 
   // Очищаем холст перед отрисовкой новой карты
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Дополнительная очистка с небольшим смещением
+  ctx.clearRect(-1, -1, canvas.width + 2, canvas.height + 2);
 
   for (let y = 0; y < map.length; y++) {
     for (let x = 0; x < map[y].length; x++) {
@@ -218,9 +222,7 @@ function generateRivers(map, heightMap, averageRiverLength) {
   });
 }
 
-const mapWidth = 250;
-const mapHeight = 125;
-const cellSize = 3;
+const cellSize = 1;
 
 const terrainSeed = generateRandomSeed();
 const variantSeed = generateRandomSeed();
@@ -251,10 +253,24 @@ const getBiomeNoise = newFractalNoise({
   persistence: defaultPersistence
 });
 
+let mapGenerated = false;
+
 function generateAndDrawMap() {
-  const physmap = generateMap(mapWidth, mapHeight, getTerrainNoise, getVariantNoise, getBiomeNoise);
-  generateRivers(physmap, physmap.map(row => row.map(cell => cell.type === terrainType.MOUNTAIN ? 1 : 0)), 250);
-  drawMap(physmap, cellSize);
+  const mapWidthInput = document.getElementById('map-width');
+  const mapHeightInput = document.getElementById('map-height');
+  const mapWidth = parseInt(mapWidthInput.value, 10);
+  const mapHeight = parseInt(mapHeightInput.value, 10);
+
+  if (mapGenerated) {
+    // Если карта уже была создана, обновляем страницу
+    location.reload();
+  } else {
+    console.log('Generating and drawing new map...');
+    const physmap = generateMap(mapWidth, mapHeight, getTerrainNoise, getVariantNoise, getBiomeNoise);
+    generateRivers(physmap, physmap.map(row => row.map(cell => cell.type === terrainType.MOUNTAIN ? 1 : 0)), 250);
+    drawMap(physmap, cellSize);
+    mapGenerated = true;
+  }
 }
 
 document.getElementById('generate-map').addEventListener('click', generateAndDrawMap);

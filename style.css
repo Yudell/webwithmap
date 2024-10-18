@@ -1,13 +1,21 @@
 body {
-    font-family: Arial, sans-serif;
+    font-family: 'Cinzel', serif;
     text-align: center;
     margin: 0;
     padding: 0;
-    background-color: #f0f0f0;
+    background-image: url('pixel-lakes-sunny-and-sunset-pixel-art-landscape-series-v0-o2haw9e2f0sb1.jpg'); /* Фоновое изображение стола */
+    background-size: cover;
+    background-position: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
 }
 
 h1 {
     margin-top: 20px;
+    color: #ece4e4;
 }
 
 button {
@@ -15,10 +23,61 @@ button {
     padding: 10px 20px;
     font-size: 16px;
     cursor: pointer;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    transition: background-color 0.3s ease;
+    font-family: 'Cinzel', serif;
+}
+
+button:hover {
+    background-color: #0056b3;
 }
 
 canvas {
-    border: hidden;
+    width: 90%; /* Ширина canvas в процентах от ширины окна */
+    max-width: 800px; /* Максимальная ширина canvas */
+    height: auto; /* Высота canvas автоматически подстраивается под соотношение сторон */
+    border: 1px solid #ccc;
+    background-color: #f0f0f0;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.5); /* Тень для пергамента */
+    border-radius: 10px; /* Скругление углов для пергамента */
     margin: 20px auto;
     display: block;
+}
+
+div {
+    margin: 10px 0;
+}
+
+label {
+    display: inline-block;
+    width: 150px;
+    text-align: right;
+    margin-right: 10px;
+    color: #000000;
+    font-family: 'Cinzel', serif;
+}
+
+input[type="number"] {
+    width: 100px;
+    padding: 5px;
+    font-size: 16px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    text-align: center;
+    font-family: 'Cinzel', serif;
+}
+
+input[type="number"]:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 5px rgba(0, 123, 255, 0.5);
+}
+
+@media (max-width: 600px) {
+    canvas {
+        width: 95%; /* Увеличиваем ширину canvas на маленьких экранах */
+    }
 }
