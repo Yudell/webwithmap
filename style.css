@@ -16,10 +16,10 @@ body {
 h1 {
     margin-top: 20px;
     color: #ece4e4;
-    /*background-color: rgba(0, 0, 0, 0.7);
+    background-color: rgba(0, 0, 0, 0.7);
     padding: 10px;
     border-radius: 5px;
-    box-shadow: 0 0 5px rgba(0, 0, 0, 0.5);*/
+    box-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
 }
 
 button {
