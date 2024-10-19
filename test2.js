@@ -222,7 +222,7 @@ function generateRivers(map, heightMap, averageRiverLength) {
   });
 }
 
-const cellSize = 1;
+const cellSize = 3;
 
 const terrainSeed = generateRandomSeed();
 const variantSeed = generateRandomSeed();

@@ -16,6 +16,10 @@ body {
 h1 {
     margin-top: 20px;
     color: #ece4e4;
+    /*background-color: rgba(0, 0, 0, 0.7);
+    padding: 10px;
+    border-radius: 5px;
+    box-shadow: 0 0 5px rgba(0, 0, 0, 0.5);*/
 }
 
 button {
@@ -49,6 +53,10 @@ canvas {
 
 div {
     margin: 10px 0;
+    background-color: rgba(0, 0, 0, 0.7); /* Темный фон для блоков */
+    padding: 10px;
+    border-radius: 5px;
+    box-shadow: 0 0 5px rgba(0, 0, 0, 0.5); /* Тень для блоков */
 }
 
 label {
@@ -56,8 +64,9 @@ label {
     width: 150px;
     text-align: right;
     margin-right: 10px;
-    color: #000000;
+    color: #ffffff; /* Белый цвет текста */
     font-family: 'Cinzel', serif;
+    font-size: 18px; /* Увеличенный размер шрифта */
 }
 
 input[type="number"] {
@@ -68,6 +77,8 @@ input[type="number"] {
     border-radius: 5px;
     text-align: center;
     font-family: 'Cinzel', serif;
+    background-color: #f0f0f0; /* Светлый фон для полей ввода */
+    color: #000000; /* Черный цвет текста */
 }
 
 input[type="number"]:focus {
