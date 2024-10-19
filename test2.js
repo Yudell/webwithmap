@@ -255,7 +255,18 @@ const getBiomeNoise = newFractalNoise({
 
 let mapGenerated = false;
 
-function generateAndDrawMap() {
+function drawStatusMessage(message) {
+  const statusMessage = document.getElementById('status-message');
+  statusMessage.textContent = message;
+  statusMessage.style.display = 'block';
+}
+
+function hideStatusMessage() {
+  const statusMessage = document.getElementById('status-message');
+  statusMessage.style.display = 'none';
+}
+
+async function generateAndDrawMap() {
   const mapWidthInput = document.getElementById('map-width');
   const mapHeightInput = document.getElementById('map-height');
   const mapWidth = parseInt(mapWidthInput.value, 10);
@@ -266,10 +277,21 @@ function generateAndDrawMap() {
     location.reload();
   } else {
     console.log('Generating and drawing new map...');
-    const physmap = generateMap(mapWidth, mapHeight, getTerrainNoise, getVariantNoise, getBiomeNoise);
+    drawStatusMessage('Generating map...');
+
+    // Генерация карты
+    const physmap = await new Promise((resolve) => {
+      setTimeout(() => {
+        resolve(generateMap(mapWidth, mapHeight, getTerrainNoise, getVariantNoise, getBiomeNoise));
+      }, 1);
+    });
+
     generateRivers(physmap, physmap.map(row => row.map(cell => cell.type === terrainType.MOUNTAIN ? 1 : 0)), 250);
     drawMap(physmap, cellSize);
     mapGenerated = true;
+
+    // Скрываем сообщение после завершения генерации карты
+    hideStatusMessage();
   }
 }
 

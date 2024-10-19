@@ -49,6 +49,7 @@ canvas {
     border-radius: 10px; /* Скругление углов для пергамента */
     margin: 20px auto;
     display: block;
+    position: relative; /* Добавляем позиционирование для внутреннего сообщения */
 }
 
 div {
@@ -85,6 +86,23 @@ input[type="number"]:focus {
     outline: none;
     border-color: #007bff;
     box-shadow: 0 0 5px rgba(0, 123, 255, 0.5);
+}
+
+.status-message {
+    position:absolute;
+    top: 75%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-family: 'Cinzel', serif;
+    font-size: 30px;
+    color: black;
+    text-align: center;
+    background-color: rgba(255, 255, 255, 0.8);
+    padding: 10px;
+    border-radius: 5px;
+    box-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
+    display: none; /* Скрываем сообщение по умолчанию */
+    z-index: 2;
 }
 
 @media (max-width: 600px) {
