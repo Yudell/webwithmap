@@ -280,6 +280,21 @@ function hideStatusMessage() {
   }
 }
 
+function centerStatusMessage() {
+  const canvas = document.getElementById('map-canvas');
+  const statusMessage = document.getElementById('status-message');
+  if (statusMessage) {
+    const canvasRect = canvas.getBoundingClientRect();
+    statusMessage.style.top = `${canvasRect.top + canvasRect.height / 2}px`;
+    statusMessage.style.left = `${canvasRect.left + canvasRect.width / 2}px`;
+    statusMessage.style.transform = 'translate(-50%, -50%)';
+  }
+}
+
+function setupResizeListener() {
+  window.addEventListener('resize', centerStatusMessage);
+}
+
 async function generateAndDrawMap() {
   const mapWidthInput = document.getElementById('map-width');
   const mapHeightInput = document.getElementById('map-height');
@@ -291,6 +306,7 @@ async function generateAndDrawMap() {
   } else {
     console.log('Generating and drawing new map...');
     drawStatusMessage('Generating map...');
+    centerStatusMessage();
 
     // Добавляем задержку в 1 секунду перед началом генерации карты
     setTimeout(async () => {
@@ -311,4 +327,8 @@ async function generateAndDrawMap() {
   }
 }
 
-document.getElementById('generate-map').addEventListener('click', generateAndDrawMap);
+document.addEventListener('DOMContentLoaded', () => {
+  centerStatusMessage();
+  setupResizeListener();
+  document.getElementById('generate-map').addEventListener('click', generateAndDrawMap);
+});

@@ -130,10 +130,7 @@ input[type="number"]:focus {
 
 .status-message {
     position: absolute;
-    top: 75%;
-    left: 50%;
     display: block;
-    transform: translate(-50%, -50%);
     font-family: 'Cinzel', serif;
     font-size: 30px;
     color: black;
@@ -145,20 +142,11 @@ input[type="number"]:focus {
     z-index: 3;
 }
 
-@media (max-height: 1000px) {
-    .status-message {
-        top: 55%;
-    }
-}
-
-@media (max-height: 800px) {
-    .status-message {
-        top: 75%;
-    }
-}
-
 @media (max-width: 600px) {
     canvas {
         width: 95%;
+    }
+    .status-message {
+        font-size: 24px;
     }
 }
