@@ -295,6 +295,17 @@ function setupResizeListener() {
   window.addEventListener('resize', centerStatusMessage);
 }
 
+function downloadMap() {
+  const canvas = document.getElementById('map-canvas');
+  const dataURL = canvas.toDataURL('image/png');
+  const link = document.createElement('a');
+  link.href = dataURL;
+  link.download = 'fantasy_map.png';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
 async function generateAndDrawMap() {
   const mapWidthInput = document.getElementById('map-width');
   const mapHeightInput = document.getElementById('map-height');
@@ -323,6 +334,10 @@ async function generateAndDrawMap() {
 
       // Скрываем status-message после завершения генерации карты
       hideStatusMessage();
+
+      // Активируем кнопку скачивания
+      const downloadButton = document.getElementById('download-map');
+      downloadButton.disabled = false;
     }, 1000); // 1000 миллисекунд = 1 секунда
   }
 }
@@ -331,4 +346,5 @@ document.addEventListener('DOMContentLoaded', () => {
   centerStatusMessage();
   setupResizeListener();
   document.getElementById('generate-map').addEventListener('click', generateAndDrawMap);
+  document.getElementById('download-map').addEventListener('click', downloadMap);
 });

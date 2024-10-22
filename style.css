@@ -18,7 +18,7 @@ body {
     height: 100vh;
     background-size: cover;
     background-position: center;
-    animation: changeBackground 20s infinite;
+    animation: changeBackground 60s infinite;
     transition: background-image 1s ease-in-out;
     z-index: -1;
 }
@@ -38,18 +38,34 @@ body {
     0%, 100% {
         background-image: url('map1.png');
     }
-    20% {
+    10% {
         background-image: url('map2.png');
     }
-    40% {
+    20% {
         background-image: url('map3.png');
     }
-    60% {
+    30% {
         background-image: url('map4.png');
     }
-    80% {
-        background-image: url('mapa.png');
+    40% {
+        background-image: url('map5.png');
     }
+    50% {
+        background-image: url('map6.png');
+    }
+    60% {
+        background-image: url('map7.png');
+    }
+    70% {
+        background-image: url('map8.png');
+    }
+    80% {
+        background-image: url('map9.png');
+    }
+    90% {
+        background-image: url('map10.png');
+    }
+    
 }
 
 h1 {
@@ -76,6 +92,11 @@ button {
 
 button:hover {
     background-color: #0056b3;
+}
+
+button:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
 }
 
 canvas {
