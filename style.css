@@ -7,20 +7,20 @@ body {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    min-height: 100vh;
 }
 
 .background {
     position: fixed;
+    margin: 0;
     top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
+    left: -10;
+    width: 100vw;
+    height: 100vh;
     background-size: cover;
     background-position: center;
     animation: changeBackground 20s infinite;
     transition: background-image 1s ease-in-out;
-    z-index: -1; /* Помещаем фон под остальные элементы */
+    z-index: -1;
 }
 
 .background::before {
@@ -30,22 +30,25 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.5); /* Полупрозрачное тёмное затенение */
-    z-index: 1; /* Помещаем затенение поверх фонового изображения */
+    background-color: rgba(0, 0, 0, 0.2);
+    z-index: 1; 
 }
 
 @keyframes changeBackground {
     0%, 100% {
         background-image: url('map1.png');
     }
-    25% {
+    20% {
         background-image: url('map2.png');
     }
-    50% {
+    40% {
         background-image: url('map3.png');
     }
-    75% {
+    60% {
         background-image: url('map4.png');
+    }
+    80% {
+        background-image: url('mapa.png');
     }
 }
 
@@ -76,25 +79,25 @@ button:hover {
 }
 
 canvas {
-    width: 90%; /* Ширина canvas в процентах от ширины окна */
-    max-width: 800px; /* Максимальная ширина canvas */
-    height: auto; /* Высота canvas автоматически подстраивается под соотношение сторон */
+    width: 90%; 
+    max-width: 800px;
+    height: auto;
     border: 1px solid #ccc;
     background-color: #f0f0f0;
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.5); /* Тень для пергамента */
-    border-radius: 10px; /* Скругление углов для пергамента */
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+    border-radius: 10px;
     margin: 20px auto;
     display: block;
-    position: relative; /* Добавляем позиционирование для внутреннего сообщения */
+    position: relative;
     z-index: 1;
 }
 
 div {
     margin: 10px 0;
-    background-color: rgba(0, 0, 0, 0.7); /* Темный фон для блоков */
+    background-color: rgba(0, 0, 0, 0.7);
     padding: 10px;
     border-radius: 5px;
-    box-shadow: 0 0 5px rgba(0, 0, 0, 0.5); /* Тень для блоков */
+    box-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
 }
 
 label {
@@ -102,9 +105,9 @@ label {
     width: 150px;
     text-align: right;
     margin-right: 10px;
-    color: #ffffff; /* Белый цвет текста */
+    color: #ffffff;
     font-family: 'Cinzel', serif;
-    font-size: 18px; /* Увеличенный размер шрифта */
+    font-size: 18px;
 }
 
 input[type="number"] {
@@ -115,8 +118,8 @@ input[type="number"] {
     border-radius: 5px;
     text-align: center;
     font-family: 'Cinzel', serif;
-    background-color: #f0f0f0; /* Светлый фон для полей ввода */
-    color: #000000; /* Черный цвет текста */
+    background-color: #f0f0f0;
+    color: #000000; 
 }
 
 input[type="number"]:focus {
@@ -129,6 +132,7 @@ input[type="number"]:focus {
     position: absolute;
     top: 75%;
     left: 50%;
+    display: block;
     transform: translate(-50%, -50%);
     font-family: 'Cinzel', serif;
     font-size: 30px;
@@ -138,12 +142,23 @@ input[type="number"]:focus {
     padding: 10px;
     border-radius: 5px;
     box-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
-    display: none; /* Скрываем сообщение по умолчанию */
     z-index: 3;
+}
+
+@media (max-height: 1000px) {
+    .status-message {
+        top: 55%;
+    }
+}
+
+@media (max-height: 800px) {
+    .status-message {
+        top: 75%;
+    }
 }
 
 @media (max-width: 600px) {
     canvas {
-        width: 95%; /* Увеличиваем ширину canvas на маленьких экранах */
+        width: 95%;
     }
 }

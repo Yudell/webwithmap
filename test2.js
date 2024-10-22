@@ -255,15 +255,29 @@ const getBiomeNoise = newFractalNoise({
 
 let mapGenerated = false;
 
+function createStatusMessage() {
+  const canvas = document.getElementById('map-canvas');
+  const statusMessage = document.createElement('div');
+  statusMessage.id = 'status-message';
+  statusMessage.className = 'status-message';
+  statusMessage.textContent = 'your map will be here...';
+  canvas.appendChild(statusMessage);
+  return statusMessage;
+}
+
 function drawStatusMessage(message) {
   const statusMessage = document.getElementById('status-message');
+  if (!statusMessage) {
+    createStatusMessage();
+  }
   statusMessage.textContent = message;
-  statusMessage.style.display = 'block';
 }
 
 function hideStatusMessage() {
   const statusMessage = document.getElementById('status-message');
-  statusMessage.style.display = 'none';
+  if (statusMessage) {
+    statusMessage.style.display = 'none';
+  }
 }
 
 async function generateAndDrawMap() {
@@ -273,25 +287,27 @@ async function generateAndDrawMap() {
   const mapHeight = parseInt(mapHeightInput.value, 10);
 
   if (mapGenerated) {
-    // Если карта уже была создана, обновляем страницу
     location.reload();
   } else {
     console.log('Generating and drawing new map...');
     drawStatusMessage('Generating map...');
 
-    // Генерация карты
-    const physmap = await new Promise((resolve) => {
-      setTimeout(() => {
-        resolve(generateMap(mapWidth, mapHeight, getTerrainNoise, getVariantNoise, getBiomeNoise));
-      }, 1);
-    });
+    // Добавляем задержку в 1 секунду перед началом генерации карты
+    setTimeout(async () => {
+      // Генерация карты
+      const physmap = await new Promise((resolve) => {
+        setTimeout(() => {
+          resolve(generateMap(mapWidth, mapHeight, getTerrainNoise, getVariantNoise, getBiomeNoise));
+        }, 1);
+      });
 
-    generateRivers(physmap, physmap.map(row => row.map(cell => cell.type === terrainType.MOUNTAIN ? 1 : 0)), 250);
-    drawMap(physmap, cellSize);
-    mapGenerated = true;
+      generateRivers(physmap, physmap.map(row => row.map(cell => cell.type === terrainType.MOUNTAIN ? 1 : 0)), 250);
+      drawMap(physmap, cellSize);
+      mapGenerated = true;
 
-    // Скрываем сообщение после завершения генерации карты
-    hideStatusMessage();
+      // Скрываем status-message после завершения генерации карты
+      hideStatusMessage();
+    }, 1000); // 1000 миллисекунд = 1 секунда
   }
 }
 
