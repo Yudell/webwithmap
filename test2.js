@@ -16,7 +16,7 @@ const terrainType = {
   RIVER: 'RIVER',
 };
 
-function generateMap(width, height, terrainNoise, variantNoise, biomeNoise) {
+function generateMap(width, height, terrainNoise, variantNoise, biomeNoise, generateDeserts) {
   const map = [];
   const heightMap = [];
   
@@ -47,7 +47,7 @@ function generateMap(width, height, terrainNoise, variantNoise, biomeNoise) {
           info.color = '#c2b281';
           info.type = terrainType.DRY_SAND;
         }
-      } else if (biomeValue > 0.5) {
+      } else if (biomeValue > 0.5 && generateDeserts) {
         info.color = '#f0e68c';
         info.type = terrainType.DESERT;
       } else if (terrainValue < 0.5) {
@@ -91,11 +91,7 @@ function drawMap(map, cellSize) {
   canvas.height = map.length * cellSize;
   const ctx = canvas.getContext('2d');
 
-  // Очищаем холст перед отрисовкой новой карты
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  // Дополнительная очистка с небольшим смещением
-  ctx.clearRect(-1, -1, canvas.width + 2, canvas.height + 2);
+  ctx.clearRect(0, 0, canvas.width, canvas.height); // Очищаем текущую карту
 
   for (let y = 0; y < map.length; y++) {
     for (let x = 0; x < map[y].length; x++) {
@@ -224,29 +220,29 @@ function generateRivers(map, heightMap, averageRiverLength) {
 
 const cellSize = 3;
 
-const terrainSeed = generateRandomSeed();
-const variantSeed = generateRandomSeed();
-const biomeSeed = generateRandomSeed();
+let terrainSeed = generateRandomSeed();
+let variantSeed = generateRandomSeed();
+let biomeSeed = generateRandomSeed();
 
-const terrainNoise = createNoise(terrainSeed);
-const variantNoise = createNoise(variantSeed);
-const biomeNoise = createNoise(biomeSeed);
+let terrainNoise = createNoise(terrainSeed);
+let variantNoise = createNoise(variantSeed);
+let biomeNoise = createNoise(biomeSeed);
 
-const getTerrainNoise = newFractalNoise({
+let getTerrainNoise = newFractalNoise({
   noise: terrainNoise,
   octaves: defaultOctaves,
   frequency: defaultFrequency,
   persistence: defaultPersistence
 });
 
-const getVariantNoise = newFractalNoise({
+let getVariantNoise = newFractalNoise({
   noise: variantNoise,
   octaves: defaultOctaves,
   frequency: defaultFrequency,
   persistence: defaultPersistence
 });
 
-const getBiomeNoise = newFractalNoise({
+let getBiomeNoise = newFractalNoise({
   noise: biomeNoise,
   octaves: defaultOctaves,
   frequency: defaultFrequency,
@@ -309,37 +305,68 @@ function downloadMap() {
 async function generateAndDrawMap() {
   const mapWidthInput = document.getElementById('map-width');
   const mapHeightInput = document.getElementById('map-height');
+  const generateRiversCheckbox = document.getElementById('generate-rivers');
+  const generateDesertsCheckbox = document.getElementById('generate-deserts');
   const mapWidth = parseInt(mapWidthInput.value, 10);
   const mapHeight = parseInt(mapHeightInput.value, 10);
 
-  if (mapGenerated) {
-    location.reload();
-  } else {
-    console.log('Generating and drawing new map...');
-    drawStatusMessage('Generating map...');
-    centerStatusMessage();
+  console.log('Generating and drawing new map...');
+  drawStatusMessage('Generating map...');
+  centerStatusMessage();
 
-    // Добавляем задержку в 1 секунду перед началом генерации карты
-    setTimeout(async () => {
-      // Генерация карты
-      const physmap = await new Promise((resolve) => {
-        setTimeout(() => {
-          resolve(generateMap(mapWidth, mapHeight, getTerrainNoise, getVariantNoise, getBiomeNoise));
-        }, 1);
-      });
+  // Обновляем сиды перед каждой генерацией карты
+  terrainSeed = generateRandomSeed();
+  variantSeed = generateRandomSeed();
+  biomeSeed = generateRandomSeed();
 
+  terrainNoise = createNoise(terrainSeed);
+  variantNoise = createNoise(variantSeed);
+  biomeNoise = createNoise(biomeSeed);
+
+  getTerrainNoise = newFractalNoise({
+    noise: terrainNoise,
+    octaves: defaultOctaves,
+    frequency: defaultFrequency,
+    persistence: defaultPersistence
+  });
+
+  getVariantNoise = newFractalNoise({
+    noise: variantNoise,
+    octaves: defaultOctaves,
+    frequency: defaultFrequency,
+    persistence: defaultPersistence
+  });
+
+  getBiomeNoise = newFractalNoise({
+    noise: biomeNoise,
+    octaves: defaultOctaves,
+    frequency: defaultFrequency,
+    persistence: defaultPersistence
+  });
+
+  // Добавляем задержку в 1 секунду перед началом генерации карты
+  setTimeout(async () => {
+    // Генерация карты
+    const physmap = await new Promise((resolve) => {
+      setTimeout(() => {
+        resolve(generateMap(mapWidth, mapHeight, getTerrainNoise, getVariantNoise, getBiomeNoise, generateDesertsCheckbox.checked));
+      }, 1);
+    });
+
+    if (generateRiversCheckbox.checked) {
       generateRivers(physmap, physmap.map(row => row.map(cell => cell.type === terrainType.MOUNTAIN ? 1 : 0)), 250);
-      drawMap(physmap, cellSize);
-      mapGenerated = true;
+    }
 
-      // Скрываем status-message после завершения генерации карты
-      hideStatusMessage();
+    drawMap(physmap, cellSize);
+    mapGenerated = true;
 
-      // Активируем кнопку скачивания
-      const downloadButton = document.getElementById('download-map');
-      downloadButton.disabled = false;
-    }, 1000); // 1000 миллисекунд = 1 секунда
-  }
+    // Скрываем status-message после завершения генерации карты
+    hideStatusMessage();
+
+    // Активируем кнопку скачивания
+    const downloadButton = document.getElementById('download-map');
+    downloadButton.disabled = false;
+  }, 1000); // 1000 миллисекунд = 1 секунда
 }
 
 document.addEventListener('DOMContentLoaded', () => {
