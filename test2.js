@@ -252,12 +252,11 @@ let getBiomeNoise = newFractalNoise({
 let mapGenerated = false;
 
 function createStatusMessage() {
-  const canvas = document.getElementById('map-canvas');
   const statusMessage = document.createElement('div');
   statusMessage.id = 'status-message';
   statusMessage.className = 'status-message';
   statusMessage.textContent = 'your map will be here...';
-  canvas.appendChild(statusMessage);
+  document.body.appendChild(statusMessage);
   return statusMessage;
 }
 
@@ -267,6 +266,7 @@ function drawStatusMessage(message) {
     createStatusMessage();
   }
   statusMessage.textContent = message;
+  statusMessage.style.display = 'block';
 }
 
 function hideStatusMessage() {
@@ -281,8 +281,8 @@ function centerStatusMessage() {
   const statusMessage = document.getElementById('status-message');
   if (statusMessage) {
     const canvasRect = canvas.getBoundingClientRect();
-    statusMessage.style.top = `${canvasRect.top + canvasRect.height / 2}px`;
-    statusMessage.style.left = `${canvasRect.left + canvasRect.width / 2}px`;
+    statusMessage.style.top = `${canvasRect.top + window.scrollY + canvasRect.height / 2}px`;
+    statusMessage.style.left = `${canvasRect.left + window.scrollX + canvasRect.width / 2}px`;
     statusMessage.style.transform = 'translate(-50%, -50%)';
   }
 }
