@@ -1,5 +1,4 @@
 import { createNoise, newFractalNoise, defaultOctaves, defaultFrequency, defaultPersistence, generateRandomSeed } from './mapgen.js';
-
 const terrainType = {
   OCEAN: 'OCEAN',
   SEA: 'SEA',
@@ -15,6 +14,8 @@ const terrainType = {
   DESERT: 'DESERT',
   RIVER: 'RIVER',
 };
+
+let physmap; // Глобальная переменная для физической карты
 
 function generateMap(width, height, terrainNoise, variantNoise, biomeNoise, generateDeserts) {
   const map = [];
@@ -265,7 +266,31 @@ function drawStatusMessage(message) {
   if (!statusMessage) {
     createStatusMessage();
   }
-  statusMessage.textContent = message;
+
+  // Get the selected language from the existing dropdown
+  let language;
+  if (document.getElementById('lang-en').classList.contains('active')) {
+    language = 'en';
+  } else if (document.getElementById('lang-ru').classList.contains('active')) {
+    language = 'ru';
+  } else {
+    language = 'en'; // Default language
+  }
+
+  // Translations for status messages
+  const translations = {
+    en: {
+      generating: 'Generating map...',
+      mapGenerated: 'Map generated!'
+    },
+    ru: {
+      generating: 'Генерируем карту...',
+      mapGenerated: 'Карта сгенерирована!'
+    }
+  };
+
+  // Set the status message based on the selected language
+  statusMessage.textContent = translations[language][message];
   statusMessage.style.display = 'block';
 }
 
@@ -303,6 +328,7 @@ function downloadMap() {
 }
 
 async function generateAndDrawMap() {
+  // Get map dimensions and options from the UI
   const mapWidthInput = document.getElementById('map-width');
   const mapHeightInput = document.getElementById('map-height');
   const generateRiversCheckbox = document.getElementById('generate-rivers');
@@ -311,14 +337,19 @@ async function generateAndDrawMap() {
   const mapHeight = parseInt(mapHeightInput.value, 10);
 
   console.log('Generating and drawing new map...');
-  drawStatusMessage('Generating map...');
+
+  // Show the status message in the selected language
+  setTimeout(() => {
+    drawStatusMessage('generating');
+  }, 0);
   centerStatusMessage();
 
-  // Обновляем сиды перед каждой генерацией карты
+  // Update seeds for each map generation
   terrainSeed = generateRandomSeed();
   variantSeed = generateRandomSeed();
   biomeSeed = generateRandomSeed();
 
+  // Reinitialize noise functions with new seeds
   terrainNoise = createNoise(terrainSeed);
   variantNoise = createNoise(variantSeed);
   biomeNoise = createNoise(biomeSeed);
@@ -327,51 +358,87 @@ async function generateAndDrawMap() {
     noise: terrainNoise,
     octaves: defaultOctaves,
     frequency: defaultFrequency,
-    persistence: defaultPersistence
+    persistence: defaultPersistence,
   });
 
   getVariantNoise = newFractalNoise({
     noise: variantNoise,
     octaves: defaultOctaves,
     frequency: defaultFrequency,
-    persistence: defaultPersistence
+    persistence: defaultPersistence,
   });
 
   getBiomeNoise = newFractalNoise({
     noise: biomeNoise,
     octaves: defaultOctaves,
     frequency: defaultFrequency,
-    persistence: defaultPersistence
+    persistence: defaultPersistence,
   });
 
-  // Добавляем задержку в 1 секунду перед началом генерации карты
+  // Add a delay before starting map generation
   setTimeout(async () => {
-    // Генерация карты
-    const physmap = await new Promise((resolve) => {
+    // Generate the map
+    physmap = await new Promise((resolve) => {
       setTimeout(() => {
-        resolve(generateMap(mapWidth, mapHeight, getTerrainNoise, getVariantNoise, getBiomeNoise, generateDesertsCheckbox.checked));
+        resolve(
+          generateMap(
+            mapWidth,
+            mapHeight,
+            getTerrainNoise,
+            getVariantNoise,
+            getBiomeNoise,
+            generateDesertsCheckbox.checked
+          )
+        );
       }, 1);
     });
 
+    // Generate rivers if the checkbox is checked
     if (generateRiversCheckbox.checked) {
-      generateRivers(physmap, physmap.map(row => row.map(cell => cell.type === terrainType.MOUNTAIN ? 1 : 0)), 250);
+      generateRivers(
+        physmap,
+        physmap.map((row) =>
+          row.map((cell) => (cell.type === terrainType.MOUNTAIN ? 1 : 0))
+        ),
+        250
+      );
     }
 
+    // Draw the map on the canvas
     drawMap(physmap, cellSize);
     mapGenerated = true;
 
-    // Скрываем status-message после завершения генерации карты
-    hideStatusMessage();
+    // Update the status message to indicate map generation is complete
+    setTimeout(() => {
+      drawStatusMessage('mapGenerated');
+    }, 0);
 
-    // Активируем кнопку скачивания
+    // Hide the status message after a short delay
+    setTimeout(() => {
+      hideStatusMessage();
+    }, 2000); // Hide after 2 seconds
+
+    // Enable the download button
     const downloadButton = document.getElementById('download-map');
     downloadButton.disabled = false;
-  }, 1000); // 1000 миллисекунд = 1 секунда
+  }, 1000); // 1-second delay before starting map generation
 }
+
+document.getElementById('lang-en').addEventListener('click', () => {
+  document.getElementById('lang-en').classList.add('active');
+  document.getElementById('lang-ru').classList.remove('active');
+});
+
+document.getElementById('lang-ru').addEventListener('click', () => {
+  document.getElementById('lang-ru').classList.add('active');
+  document.getElementById('lang-en').classList.remove('active');
+});
 
 document.addEventListener('DOMContentLoaded', () => {
   centerStatusMessage();
   setupResizeListener();
   document.getElementById('generate-map').addEventListener('click', generateAndDrawMap);
   document.getElementById('download-map').addEventListener('click', downloadMap);
+  
 });
+

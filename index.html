@@ -12,29 +12,98 @@
 </head>
 <body>
     <div class="background"></div>
-    <h1>Fantasy Pixel Map Generator</h1>
+    <rb class="language-switcher">
+        <button id="lang-toggle" data-i18n="langtoggle">Language</button>
+        <ul id="lang-list">
+          <li><button id="lang-en" class="active">English</button></li>
+          <li><button id="lang-ru">Русский</button></li>
+        </ul>
+    </rb>
+    <rb class="mobile-menu">
+        <button id="burger-toggle">&#9776;</button>
+        <ul id="mobile-lang-list" class="mobile-lang-list">
+            <li><button id="mobile-lang-en">English</button></li>
+            <li><button id="mobile-lang-ru">Русский</button></li>
+        </ul>
+    </rb>
+    <h1 data-i18n="title">Fantasy Pixel Map Generator</h1>
     <div>
-        <label for="map-width">Map Width:</label>
+        <label for="map-width" data-i18n="mapWidth">Map Width:</label>
         <input type="number" id="map-width" value="500" min="100" max="1000">
     </div>
     <div>
-        <label for="map-height">Map Height:</label>
+        <label for="map-height" data-i18n="mapHeight">Map Height:</label>
         <input type="number" id="map-height" value="500" min="100" max="1000">
     </div>
     <div>
-        <label for="generate-rivers">Enable Rivers:</label>
+        <label for="generate-rivers" data-i18n="generateRivers">Enable Rivers:</label>
         <input type="checkbox" id="generate-rivers" checked>
     </div>
     <div>
-        <label for="generate-deserts">Enable Deserts:</label>
+        <label for="generate-deserts" data-i18n="generateDeserts">Enable Deserts:</label>
         <input type="checkbox" id="generate-deserts" checked>
     </div>
-    <button id="generate-map">Generate New Map</button>
+    <button id="generate-map" data-i18n="generateMap">Generate New Map</button>
     <canvas id="map-canvas"></canvas>
-    <div id="status-message" class="status-message">your map will be here...</div>
-    <button id="download-map" disabled>Download Map</button>
+    <div id="status-message" class="status-message" data-i18n="statusMessage">your map will be here...</div>
+    <button id="download-map" disabled data-i18n="downloadMap">Download Map</button>
+    <button id="generate-political-map" style="display: none;">Generate Political Map</button>
+    <canvas id="political-map-canvas" style="display: none;"></canvas>
     <script src="dist/bundle.js"></script>
     <script>
+        const translations = {
+            en: {
+                langtoggle: "Language",
+                title: "Fantasy Pixel Map Generator",
+                mapWidth: "Map Width:",
+                mapHeight: "Map Height:",
+                generateRivers: "Enable Rivers:",
+                generateDeserts: "Enable Deserts:",
+                generateMap: "Generate New Map",
+                downloadMap: "Download Map",
+                statusMessage: "your map will be here...",
+                generatingMapMessage: "Generating map...",
+            },
+            ru: {
+                langtoggle: "Язык",
+                title: "Генератор Фэнтезийных Пиксельных Карт",
+                mapWidth: "Ширина Карты:",
+                mapHeight: "Высота Карты:",
+                generateRivers: "Включить Реки:",
+                generateDeserts: "Включить Пустыни:",
+                generateMap: "Сгенерировать Новую Карту",
+                downloadMap: "Скачать Карту",
+                statusMessage: "Ваша карта будет здесь...",
+                generatingMapMessage: "Карта генерируется...",
+            }
+        };
+
+        function setLanguage(lang) {
+            const elements = document.querySelectorAll('[data-i18n]');
+            elements.forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                el.textContent = translations[lang][key];
+            });
+        }
+
+        document.getElementById('lang-en').addEventListener('click', () => setLanguage('en'));
+        document.getElementById('lang-ru').addEventListener('click', () => setLanguage('ru'));
+        document.getElementById('mobile-lang-en').addEventListener('click', () => setLanguage('en'));
+        document.getElementById('mobile-lang-ru').addEventListener('click', () => setLanguage('ru'));
+
+        // Устанавливаем язык по умолчанию
+        setLanguage('en');
+
+        // Логика для переключения мобильного меню
+        document.getElementById('burger-toggle').addEventListener('click', () => {
+            const mobileMenu = document.getElementById('mobile-lang-list');
+            if (mobileMenu.style.display === 'block') {
+                mobileMenu.style.display = 'none';
+            } else {
+                mobileMenu.style.display = 'block';
+            }
+        });
+
         function preloadImages() {
             const images = [
                 'map1.png', 'map2.png', 'map3.png', 'map4.png', 'map5.png',

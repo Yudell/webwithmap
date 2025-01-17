@@ -40,4 +40,4 @@ const predefinedColors = [
   '#f7d794', // Желтый
 ];
 
-export default predefinedColors;
+export {predefinedColors};
