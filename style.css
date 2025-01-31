@@ -293,3 +293,8 @@ rb {
     }
     
 }
+
+#political-map-canvas {
+    margin-top: 20px; /* Отступ между картами */
+    border: 1px solid #000; /* Граница для визуального разделения */
+}

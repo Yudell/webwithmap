@@ -44,11 +44,12 @@
         <input type="checkbox" id="generate-deserts" checked>
     </div>
     <button id="generate-map" data-i18n="generateMap">Generate New Map</button>
+    <button id="generate-political-map" style="display: none;" data-i18n="generatePoliticalMap">Generate Political Map</button>
     <canvas id="map-canvas"></canvas>
+    <canvas id="political-map-canvas" style="display: none;"></canvas>
     <div id="status-message" class="status-message" data-i18n="statusMessage">your map will be here...</div>
     <button id="download-map" disabled data-i18n="downloadMap">Download Map</button>
-    <button id="generate-political-map" style="display: none;">Generate Political Map</button>
-    <canvas id="political-map-canvas" style="display: none;"></canvas>
+    <button id="download-political-map" style="display: none;" data-i18n="downloadPoliticalMap">Download Political Map</button>
     <script src="dist/bundle.js"></script>
     <script>
         const translations = {
@@ -61,8 +62,10 @@
                 generateDeserts: "Enable Deserts:",
                 generateMap: "Generate New Map",
                 downloadMap: "Download Map",
+                downloadPoliticalMap: "Download Political Map",
                 statusMessage: "your map will be here...",
                 generatingMapMessage: "Generating map...",
+                generatePoliticalMap: "Generate Political Map"
             },
             ru: {
                 langtoggle: "Язык",
@@ -73,8 +76,10 @@
                 generateDeserts: "Включить Пустыни:",
                 generateMap: "Сгенерировать Новую Карту",
                 downloadMap: "Скачать Карту",
+                downloadPoliticalMap: "Скачать Политическую Карту",
                 statusMessage: "Ваша карта будет здесь...",
                 generatingMapMessage: "Карта генерируется...",
+                generatePoliticalMap: "Сгенерировать Политическую Карту"
             }
         };
 
