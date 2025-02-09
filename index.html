@@ -45,11 +45,19 @@
     </div>
     <button id="generate-map" data-i18n="generateMap">Generate New Map</button>
     <button id="generate-political-map" style="display: none;" data-i18n="generatePoliticalMap">Generate Political Map</button>
+    <select id="country-list" style="display: none;" data-i18n="country-select">
+        <option value="">Choose a country</option>
+    </select>
+    <button id="generate-country-map" style="display: none;" data-i18n="generateCountryMap">Generate Country Map</button>
     <canvas id="map-canvas"></canvas>
     <canvas id="political-map-canvas" style="display: none;"></canvas>
+    <canvas id="country-map-canvas" style="display: none;"></canvas>
     <div id="status-message" class="status-message" data-i18n="statusMessage">your map will be here...</div>
     <button id="download-map" disabled data-i18n="downloadMap">Download Map</button>
     <button id="download-political-map" style="display: none;" data-i18n="downloadPoliticalMap">Download Political Map</button>
+    <select id="country-select" style="display: none;">
+        <option value="">Select a country</option>
+      </select>
     <script src="dist/bundle.js"></script>
     <script>
         const translations = {
@@ -65,7 +73,9 @@
                 downloadPoliticalMap: "Download Political Map",
                 statusMessage: "your map will be here...",
                 generatingMapMessage: "Generating map...",
-                generatePoliticalMap: "Generate Political Map"
+                generatePoliticalMap: "Generate Political Map",
+                generateCountryMap: "Generate Country Map",
+                countrySelect: "Select a country"
             },
             ru: {
                 langtoggle: "Язык",
@@ -79,7 +89,9 @@
                 downloadPoliticalMap: "Скачать Политическую Карту",
                 statusMessage: "Ваша карта будет здесь...",
                 generatingMapMessage: "Карта генерируется...",
-                generatePoliticalMap: "Сгенерировать Политическую Карту"
+                generatePoliticalMap: "Сгенерировать Политическую Карту",
+                generateCountryMap: "Сгенерировать Карту Страны",
+                countrySelect: "Выберите страну"
             }
         };
 
