@@ -18,6 +18,7 @@ const terrainType = {
 
 let physmap = null; // Глобальная переменная для физической карты
 let politicalMap = null; // Глобальная переменная для политической карты
+let countryNames = {};
 
 function generateMap(width, height, terrainNoise, variantNoise, biomeNoise, generateDeserts) {
   const map = [];
@@ -978,6 +979,59 @@ function createCountryList(countryNames) {
   countryList.style.display = 'block';
 }
 
+
+
+
+
+
+function generateCities(politicalMap, physmap, selectedCountryId) {
+  const cities = [];
+  const cityCount = Math.max(3, Math.floor(Math.random() * 7) + 3); // От 3 до 10 городов
+  const cityNames = ["Vereshiu", "Beyof", "Xelerm", "Yelor", "Eriery", "Alustheu", "Giler", "Corux", "Aeluygh", "Gilinrhoe"];
+  
+  for (let i = 0; i < cityCount; i++) {
+      let x, y;
+      let attempts = 0;
+      do {
+          x = Math.floor(Math.random() * politicalMap[0].length);
+          y = Math.floor(Math.random() * politicalMap.length);
+          attempts++;
+          if (attempts > 1000) break;
+      } while (
+          politicalMap[y][x] !== selectedCountryId || 
+          (physmap[y][x].type !== 'RIVER' && physmap[y][x].type !== 'SEA' && physmap[y][x].type !== 'OCEAN' && Math.random() > 0.5)
+      );
+
+      const citySize = Math.floor(Math.random() * 7) + 2; // Размер города от 2 до 8 клеток
+      const cityCells = [{ x, y }];
+      
+      for (let j = 1; j < citySize; j++) {
+          const lastCell = cityCells[Math.floor(Math.random() * cityCells.length)];
+          const directions = [
+              { dx: -1, dy: 0 }, { dx: 1, dy: 0 },
+              { dx: 0, dy: -1 }, { dx: 0, dy: 1 }
+          ];
+          directions.sort(() => Math.random() - 0.5);
+          for (const { dx, dy } of directions) {
+              const newX = lastCell.x + dx;
+              const newY = lastCell.y + dy;
+              if (
+                  newX >= 0 && newX < politicalMap[0].length &&
+                  newY >= 0 && newY < politicalMap.length &&
+                  politicalMap[newY][newX] === selectedCountryId &&
+                  !cityCells.some(c => c.x === newX && c.y === newY)
+              ) {
+                  cityCells.push({ x: newX, y: newY });
+                  break;
+              }
+          }
+      }
+      const cityName = cityNames[i % cityNames.length];
+      cities.push({ cells: cityCells, name: cityName });
+  }
+  return cities;
+}
+
 document.getElementById('generate-country-map').addEventListener('click', () => {
   const countryList = document.getElementById('country-list');
   const selectedCountryId = parseInt(countryList.value, 10);
@@ -998,12 +1052,12 @@ document.getElementById('generate-country-map').addEventListener('click', () => 
       return;
   }
 
-  const mapWidth = politicalMap[0].length;
-  const mapHeight = politicalMap.length;
+  const mapWidth = 1500;
+  const mapHeight = 1500;
   let minX = mapWidth, maxX = 0, minY = mapHeight, maxY = 0;
   
-  for (let y = 0; y < mapHeight; y++) {
-      for (let x = 0; x < mapWidth; x++) {
+  for (let y = 0; y < politicalMap.length; y++) {
+      for (let x = 0; x < politicalMap[y].length; x++) {
           if (politicalMap[y][x] === selectedCountryId) {
               if (x < minX) minX = x;
               if (x > maxX) maxX = x;
@@ -1019,46 +1073,95 @@ document.getElementById('generate-country-map').addEventListener('click', () => 
   const extraHeight = Math.floor(countryHeight * 0.1);
   
   const startX = Math.max(0, minX - extraWidth);
-  const endX = Math.min(mapWidth - 1, maxX + extraWidth);
+  const endX = Math.min(politicalMap[0].length - 1, maxX + extraWidth);
   const startY = Math.max(0, minY - extraHeight);
-  const endY = Math.min(mapHeight - 1, maxY + extraHeight);
+  const endY = Math.min(politicalMap.length - 1, maxY + extraHeight);
 
-  const newWidth = endX - startX + 1;
-  const newHeight = endY - startY + 1;
+  let newWidth = endX - startX + 1;
+  let newHeight = endY - startY + 1;
+
+  const scaleFactor = Math.min(1500 / newWidth, 1500 / newHeight) * 2;
+  const scaledCellSize = Math.max(2, Math.floor(cellSize * scaleFactor));
+  newWidth *= scaledCellSize;
+  newHeight *= scaledCellSize;
 
   const countryMapCanvas = document.getElementById('country-map-canvas');
   const ctx = countryMapCanvas.getContext('2d');
-  countryMapCanvas.width = newWidth * cellSize;
-  countryMapCanvas.height = newHeight * cellSize;
+  countryMapCanvas.width = newWidth;
+  countryMapCanvas.height = newHeight;
   
   ctx.clearRect(0, 0, countryMapCanvas.width, countryMapCanvas.height);
-  
+
+  function isWater(type) {
+      return type === 'OCEAN' || type === 'SEA' || type === 'RIVER';
+  }
+
+  function shouldDrawBorder(x, y, nx, ny) {
+      const neighborType = physmap[ny]?.[nx]?.type;
+      return (
+          politicalMap[y][x] === selectedCountryId && 
+          politicalMap[ny]?.[nx] !== selectedCountryId && 
+          !isWater(neighborType)
+      );
+  }
+
   for (let y = startY; y <= endY; y++) {
       for (let x = startX; x <= endX; x++) {
-          if (politicalMap[y][x] === selectedCountryId) {
-              ctx.fillStyle = physmap[y][x]?.color || '#000000';
-              ctx.fillRect((x - startX) * cellSize, (y - startY) * cellSize, cellSize, cellSize);
+          const tile = physmap[y][x];
+          if (tile) {
+              ctx.fillStyle = tile.color || '#000000';
+              ctx.fillRect((x - startX) * scaledCellSize, (y - startY) * scaledCellSize, scaledCellSize, scaledCellSize);
+              if (politicalMap[y][x] !== selectedCountryId) {
+                  ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+                  ctx.fillRect((x - startX) * scaledCellSize, (y - startY) * scaledCellSize, scaledCellSize, scaledCellSize);
+              }
           }
       }
   }
+
+  const cities = generateCities(politicalMap, physmap, selectedCountryId);
+    ctx.fillStyle = '#8B0000';
+    /*ctx.fillStyle = 'black';
+    ctx.font = `${Math.max(16, scaledCellSize * 2)}px Cinzel`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';*/
+    
+    for (const city of cities) {
+        for (const cell of city.cells) {
+            ctx.fillRect((cell.x - startX) * scaledCellSize, (cell.y - startY) * scaledCellSize, scaledCellSize, scaledCellSize);
+        }
+        const centerX = city.cells[0].x - startX;
+        const centerY = city.cells[0].y - startY;
+        ctx.fillText(city.name, centerX * scaledCellSize, (centerY - 3) * scaledCellSize);
+    }
+
+  ctx.strokeStyle = 'black';
+  ctx.lineWidth = Math.max(2, scaledCellSize * 0.1);
+  ctx.beginPath();
+  for (let y = startY; y <= endY; y++) {
+      for (let x = startX; x <= endX; x++) {
+          if (politicalMap[y][x] === selectedCountryId) {
+              if (shouldDrawBorder(x, y, x - 1, y)) {
+                  ctx.moveTo((x - startX) * scaledCellSize, (y - startY) * scaledCellSize);
+                  ctx.lineTo((x - startX) * scaledCellSize, (y - startY + 1) * scaledCellSize);
+              }
+              if (shouldDrawBorder(x, y, x + 1, y)) {
+                  ctx.moveTo((x - startX + 1) * scaledCellSize, (y - startY) * scaledCellSize);
+                  ctx.lineTo((x - startX + 1) * scaledCellSize, (y - startY + 1) * scaledCellSize);
+              }
+              if (shouldDrawBorder(x, y, x, y - 1)) {
+                  ctx.moveTo((x - startX) * scaledCellSize, (y - startY) * scaledCellSize);
+                  ctx.lineTo((x - startX + 1) * scaledCellSize, (y - startY) * scaledCellSize);
+              }
+              if (shouldDrawBorder(x, y, x, y + 1)) {
+                  ctx.moveTo((x - startX) * scaledCellSize, (y - startY + 1) * scaledCellSize);
+                  ctx.lineTo((x - startX + 1) * scaledCellSize, (y - startY + 1) * scaledCellSize);
+              }
+          }
+      }
+  }
+  ctx.stroke();
   
   countryMapCanvas.style.display = 'block';
-
-  let downloadButton = document.getElementById('download-country-map');
-  if (!downloadButton) {
-      downloadButton = document.createElement('button');
-      downloadButton.id = 'download-country-map';
-      downloadButton.textContent = 'Скачать карту страны';
-      document.body.appendChild(downloadButton);
-  }
-
-  downloadButton.addEventListener('click', () => {
-      const dataURL = countryMapCanvas.toDataURL('image/png');
-      const link = document.createElement('a');
-      link.href = dataURL;
-      link.download = 'country_map.png';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-  });
 });
+
