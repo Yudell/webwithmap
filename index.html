@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pixel Fantasy Map Generator</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            margin: 0;
+            overflow: hidden;
+            background: #1a1a1a;
+        }
+        canvas {
+            image-rendering: pixelated;
+        }
+        .controls {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            z-index: 1;
+            gap: 10px;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 5px;
+        }
+
+        #scale-display {
+            color: white;
+            font-family: 'Cinzel', serif;
+            min-width: 50px;
+            text-align: center;
+        }
+        button {
+            padding: 8px 15px;
+            background: #2c2c2c;
+            color: white;
+            border: 1px solid #444;
+            cursor: pointer;
+            font-family: 'Cinzel', serif;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="map-canvas"></canvas>
+    <div class="controls">
+        <button id="zoom-in">+</button>
+        <button id="zoom-out">-</button>
+        <span id="scale-display">100%</span>
+        <button id="generate-map">Generate</button>
+        <button id="download-map">Download</button>
+    </div>
+    <script src="dist/bundle.js" type="module"></script>
+</body>
+</html>
