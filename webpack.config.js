@@ -1,7 +1,7 @@
 const path = require('path');
 
 module.exports = {
-  entry: './test2.js',
+  entry: './map-view.js',
   output: {
     filename: 'bundle.js',
     path: path.resolve(__dirname, 'dist'),
