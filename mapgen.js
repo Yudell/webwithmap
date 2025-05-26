@@ -16,7 +16,7 @@ function newFractalNoise(info) {
     frequency = defaultFrequency,
     persistence = defaultPersistence,
     stretchX = 1.0,
-    stretchY = 1.0 
+    stretchY = 1.0
   } = info;
 
   return function getFractalNoise(x, y) {

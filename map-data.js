@@ -1,4 +1,5 @@
 import { createNoise, newFractalNoise, defaultOctaves, defaultFrequency, defaultPersistence, generateRandomSeed } from './mapgen.js';
+import { generatePoliticalLayer } from './political-map-gen.js';
 
 export const terrainType = {
   OCEAN: 'OCEAN',
@@ -16,6 +17,8 @@ export const terrainType = {
 };
 
 let physmap = null;
+let politicalMap = null;
+let currentMapSeeds = null;
 let cellSize = 3;
 
 let currentGenerationScale = 1;
@@ -44,6 +47,8 @@ function initializeNoiseGenerators() {
     detail: generateRandomSeed(), sand: generateRandomSeed(), mountain1: generateRandomSeed(),
     mountain2: generateRandomSeed()
   };
+  currentMapSeeds = seeds; 
+
   const sandNoise = newFractalNoise({ noise: createNoise(seeds.sand), octaves: 10, frequency: 0.1, persistence: 0.01 });
   return {
     terrainNoise: newFractalNoise({ noise: createNoise(seeds.terrain), octaves: defaultOctaves, frequency: defaultFrequency, persistence: defaultPersistence }),
@@ -58,7 +63,7 @@ function initializeNoiseGenerators() {
 export function generateNewPhysmapData() {
   cellSize = calculateCellSizeForGenerationInternal();
   const { width, height } = getMapDataDimensionsInternal();
-  const noise = initializeNoiseGenerators();
+  const noise = initializeNoiseGenerators(); 
   const newMap = [];
   for (let y = 0; y < height; y++) {
     newMap[y] = [];
@@ -94,10 +99,25 @@ export function generateNewPhysmapData() {
     }
   }
   physmap = newMap;
+  politicalMap = null; 
+}
+
+export function generateAndStorePoliticalMap() {
+    if (!physmap || !currentMapSeeds) {
+        console.error("Cannot generate political map without physical map or seeds.");
+        return false;
+    }
+    const { width, height } = getMapDataDimensionsInternal();
+    politicalMap = generatePoliticalLayer(physmap, currentMapSeeds, width, height);
+    return politicalMap !== null;
 }
 
 export function getPhysmap() {
   return physmap;
+}
+
+export function getPoliticalMap() {
+    return politicalMap;
 }
 
 export function getCellSize() {
