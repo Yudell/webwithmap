@@ -91,7 +91,7 @@ function generateSyllable() {
         if (Math.random() < 0.4) { 
             syllable += randomElement(CONSONANTS_END);
         }
-    } else { // V + C
+    } else {
         syllable += randomElement(VOWELS);
         syllable += randomElement(CONSONANTS_END);
     }
@@ -183,7 +183,6 @@ export function generatePoliticalLayer(physmap, baseSeeds, mapWidth, mapHeight) 
     }
 
     if (capitals.length === 0 && numNations > 0 && mapArea > 0) {
-        console.warn("Standard capital placement failed. Attempting fallback.");
         const landCells = [];
         for (let r = 0; r < mapHeight; r++) {
             for (let c = 0; c < mapWidth; c++) {
@@ -234,7 +233,6 @@ export function generatePoliticalLayer(physmap, baseSeeds, mapWidth, mapHeight) 
         { dx: -1, dy: 0, currentSide: 'left' },{ dx: 1, dy: 0,  currentSide: 'right' }
     ];
 
-    // --- Initial Land Expansion ---
     while(head < landExpansionQueue.length) {
         const current = landExpansionQueue[head++];
         const currentDist = nationMap[current.y][current.x].dist;
@@ -252,6 +250,7 @@ export function generatePoliticalLayer(physmap, baseSeeds, mapWidth, mapHeight) 
 
                 let baseStepCost = 1.0;
                 if (neighborTerrainCell.type === terrainType.FOREST) baseStepCost = 1.8;
+                else if (neighborTerrainCell.type === terrainType.RIVER) baseStepCost = 1.4;
                 else if (neighborTerrainCell.type === terrainType.WET_GRASS || neighborTerrainCell.type === terrainType.DRY_GRASS) baseStepCost = 1.2;
                 else if (neighborTerrainCell.type === terrainType.SAND || neighborTerrainCell.type === terrainType.DRY_SAND || neighborTerrainCell.type === terrainType.WET_SAND) baseStepCost = 1.5;
                 else if (neighborTerrainCell.type === terrainType.MOUNTAIN ||
@@ -325,10 +324,11 @@ export function generatePoliticalLayer(physmap, baseSeeds, mapWidth, mapHeight) 
                         continue;
                     }
                     costToNeighbor = SEA_CROSSING_COST_MULTIPLIER;
-                } else { // Neighbor is land
+                } else {
                     newWaterDist = 0;
                     let baseStepCost = 1.0;
                     if (neighborPhysCell.type === terrainType.FOREST) baseStepCost = 1.8;
+                    else if (neighborPhysCell.type === terrainType.RIVER) baseStepCost = 1.4;
                     else if (neighborPhysCell.type === terrainType.WET_GRASS || neighborPhysCell.type === terrainType.DRY_GRASS) baseStepCost = 1.2;
                     else if (neighborPhysCell.type === terrainType.SAND || neighborPhysCell.type === terrainType.DRY_SAND || neighborPhysCell.type === terrainType.WET_SAND) baseStepCost = 1.5;
                     else if (neighborPhysCell.type === terrainType.MOUNTAIN ||
