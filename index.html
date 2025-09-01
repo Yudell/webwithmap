@@ -6,7 +6,7 @@
     <title>Pixel Fantasy Map Generator</title>
     <meta name="description" content="Free pixel map generator that will help you create fantasy pixel maps">
     <meta name="google-site-verification" content="UeRBCGdQKxLffTwx3o4NLHZZiiMch9loAmotnlHrj6g" />
-    <meta property="og:title" content="Pixel Fantasy Map Generator">
+    <meta property="og-title" content="Pixel Fantasy Map Generator">
     <link href="https://fonts.googleapis.com/css2?family=Cinzel&display=swap" rel="stylesheet">
     <style>
         body { 
@@ -17,47 +17,315 @@
         canvas {
             image-rendering: pixelated;
         }
-        .controls {
+        
+        /* --- СТИЛИ МЕНЮ --- */
+        .controls-wrapper {
             position: fixed;
             top: 10px;
             right: 10px;
-            z-index: 1;
-            display: flex;
-            flex-wrap: wrap; 
-            gap: 10px;
-            align-items: center;
-            background: rgba(0, 0, 0, 0.7);
-            padding: 10px;
+            z-index: 2; 
+            pointer-events: none; 
+        }
+        
+        #menu-toggle {
+            position: absolute;
+            top: 0;
+            right: 0;
+            cursor: pointer;
+            width: 40px;
+            height: 40px;
+            background: rgba(0, 0, 0, 0.8);
             border-radius: 5px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 3;
+            transition: background-color 0.3s ease;
+            pointer-events: auto; 
+        }
+        
+        #menu-toggle svg {
+            width: 20px;
+            height: 20px;
+            fill: white;
+            transition: transform 0.3s ease-in-out;
+        }
+        
+        .controls {
+            width: 320px;
+            background: rgba(0, 0, 0, 0.8);
+            border-radius: 5px;
+            font-family: 'Cinzel', serif;
+            color: white;
+            padding: 10px;
+            box-sizing: border-box;
+            transform: translateX(100%);
+            margin-right: -20px;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease-in-out;
+            pointer-events: auto; 
+        }
+        
+        .controls-wrapper.expanded .controls {
+            transform: translateX(0);
+            margin-right: 0;
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .controls-wrapper.expanded #menu-toggle {
+            background-color: transparent; 
+        }
+        
+        .controls-wrapper.expanded #menu-toggle svg {
+            transform: rotate(180deg);
+        }
+        
+        .menu-tabs {
+            display: flex;
+            border-bottom: 1px solid #444;
+            margin-bottom: 10px;
+            padding-right: inherit;
+        }
+        
+        .menu-tabs button {
+            background: none;
+            border: none;
+            color: #aaa;
+            padding: 8px 12px;
+            font-family: 'Cinzel', serif;
+            font-size: 14px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s ease;
+        }
+        
+        .menu-tabs button:hover {
+            color: white;
+        }
+        
+        .menu-tabs button.active-tab {
+            color: white;
+            border-bottom-color: white;
         }
 
-        #scale-display {
-            color: white;
-            font-family: 'Cinzel', serif;
-            min-width: 50px;
-            text-align: center;
+        .menu-content-panel {
+            display: none;
         }
+        
+        .menu-content-panel.active {
+            display: block;
+        }
+        
+        .control-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .control-group:last-child {
+            margin-bottom: 0;
+        }
+        
         button {
-            padding: 8px 15px;
+            padding: 8px 12px;
             background: #2c2c2c;
             color: white;
             border: 1px solid #444;
             cursor: pointer;
             font-family: 'Cinzel', serif;
+            flex-grow: 1;
         }
-        #generate-political-map {
+
+        #seed-input {
+            padding: 8px;
+            background: #2c2c2c;
+            color: white;
+            border: 1px solid #444;
+            font-family: 'Cinzel', serif;
+            width: 100%;
+            box-sizing: border-box;
         }
+
+        #scale-display {
+            color: white;
+            min-width: 50px;
+            text-align: center;
+        }
+        
+        .slider-group {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 4px;
+        }
+        .slider-group label {
+            font-size: 13px;
+            padding-left: 2px;
+            text-align: left;
+            margin-bottom: 2px;
+        }
+        .slider-group .label-wrapper {
+             display: flex;
+             justify-content: space-between;
+             align-items: center;
+        }
+        .slider-group input[type="range"] {
+            width: 100%;
+            margin: 0;
+        }
+        .slider-group span {
+            text-align: center;
+            font-size: 12px;
+            color: #ccc;
+            min-width: 40px;
+        }
+
+        /* --- СТИЛИ POPUP --- */
+        .info-popup { display: none; position: fixed; z-index: 10; background: rgba(26, 26, 26, 0.9); color: #e0e0e0; border: 1px solid #444; border-radius: 8px; padding: 15px; font-family: 'Cinzel', serif; box-shadow: 0 4px 12px rgba(0,0,0,0.5); max-width: 250px; cursor: default; }
+        .info-popup:not(.no-drag) { cursor: grab; }
+        .info-popup .close-btn { position: absolute; top: 5px; right: 5px; background: none; border: none; color: white; font-size: 20px; line-height: 1; padding: 0 5px; cursor: pointer; pointer-events: all; }
+        .info-popup h3 { margin: 0 0 10px; color: #fff; padding-right: 20px; }
+        .info-popup p { margin: 0; font-size: 14px; }
+
+        .title-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        #nation-color-picker {
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            width: 24px;
+            height: 24px;
+            padding: 0;
+            border: 1px solid #555;
+            border-radius: 4px;
+            cursor: pointer;
+            background-color: transparent;
+        }
+        #nation-color-picker::-webkit-color-swatch {
+            border-radius: 3px;
+            border: none;
+        }
+        #nation-color-picker::-moz-color-swatch {
+            border-radius: 3px;
+            border: none;
+        }
+
+        .loading-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.8); color: white; font-family: 'Cinzel', serif; font-size: 24px; display: flex; justify-content: center; align-items: center; z-index: 1000; flex-direction: column; }
+        .loading-spinner { border: 4px solid rgba(255, 255, 255, 0.3); border-top: 4px solid #fff; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 15px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="loading-spinner"></div>
+        <p>Generating Map...</p>
+    </div>
+
     <canvas id="map-canvas"></canvas>
-    <div class="controls">
-        <button id="zoom-in">+</button>
-        <button id="zoom-out">-</button>
-        <span id="scale-display">100%</span>
-        <button id="generate-map">Generate</button>
-        <button id="generate-political-map" style="display: none;">Politics</button>
-        <button id="download-map">Download</button>
+    
+    <div class="controls-wrapper">
+        <div id="menu-toggle" title="Toggle Menu">
+            <svg viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
+        </div>
+        
+        <div class="controls">
+            <div class="menu-tabs">
+                <button class="menu-tab-button active-tab" data-tab-id="generation">Generation</button>
+                <button class="menu-tab-button" data-tab-id="layers">Layers</button>
+                <button class="menu-tab-button" data-tab-id="save">Save</button>
+            </div>
+            
+            <div class="menu-content-area">
+                <!-- Панель 1: Generation -->
+                <div class="menu-content-panel active" data-content-id="generation">
+                    <div class="control-group">
+                        <button id="zoom-out" title="Decrease map detail">-</button>
+                        <span id="scale-display" title="Map generation detail">100%</span>
+                        <button id="zoom-in" title="Increase map detail">+</button>
+                    </div>
+
+                    <div class="control-group slider-group">
+                        <div class="label-wrapper">
+                            <label for="water-level-slider">Water Level</label>
+                            <span id="water-level-display">50%</span>
+                        </div>
+                        <input type="range" id="water-level-slider" min="0.05" max="0.35" step="0.01" value="0.2">
+                    </div>
+
+                    <div class="control-group slider-group">
+                         <div class="label-wrapper">
+                            <label for="mountain-slider">Mountains</label>
+                            <span id="mountain-display">50%</span>
+                        </div>
+                        <input type="range" id="mountain-slider" min="0.4" max="0.7" step="0.01" value="0.55">
+                    </div>
+
+                    <div class="control-group slider-group">
+                         <div class="label-wrapper">
+                            <label for="forest-slider">Forests</label>
+                            <span id="forest-display">33%</span>
+                        </div>
+                        <input type="range" id="forest-slider" min="0.5" max="0.9" step="0.01" value="0.7">
+                    </div>
+                    
+                    <div class="control-group slider-group">
+                        <div class="label-wrapper">
+                            <label for="nation-slider">Nations</label>
+                            <span id="nation-display">8</span>
+                        </div>
+                        <input type="range" id="nation-slider" min="2" max="25" step="1" value="8">
+                    </div>
+
+                    <div class="control-group slider-group">
+                        <div class="label-wrapper">
+                            <label for="settlement-slider">Settlements</label>
+                            <span id="settlement-display">100%</span>
+                        </div>
+                        <input type="range" id="settlement-slider" min="0" max="2.5" step="0.1" value="0.5">
+                    </div>
+
+                    <div class="control-group">
+                        <button id="generate-map">Generate New Map</button>
+                    </div>
+                </div>
+
+                <!-- Панель 2: Layers -->
+                <div class="menu-content-panel" data-content-id="layers">
+                     <div class="control-group">
+                        <button id="toggle-political-layer">Politics</button>
+                        <button id="toggle-settlements-layer">Settlements</button>
+                    </div>
+                </div>
+
+                <!-- Панель 3: Save -->
+                <div class="menu-content-panel" data-content-id="save">
+                    <div class="control-group">
+                        <input type="text" id="seed-input" placeholder="Paste map seed here">
+                    </div>
+                    <div class="control-group">
+                        <button id="load-seed">Load Seed</button>
+                        <button id="copy-seed">Copy Seed</button>
+                    </div>
+                    <div class="control-group">
+                        <button id="download-map">Download Map</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="nation-info-popup" class="info-popup">
+        <button class="close-btn">×</button>
+        <div class="title-wrapper">
+            <input type="color" id="nation-color-picker" title="Change nation color">
+            <h3 id="nation-name">Nation Name</h3>
+        </div>
+        <p id="nation-details"></p>
     </div>
     <script src="dist/bundle.js" type="module"></script>
 </body>

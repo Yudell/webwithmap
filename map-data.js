@@ -1,26 +1,20 @@
 import { createNoise, newFractalNoise, defaultOctaves, defaultFrequency, defaultPersistence, generateRandomSeed } from './mapgen.js';
 import { generatePoliticalLayer } from './political-map-gen.js';
-
-export const terrainType = {
-  OCEAN: 'OCEAN',
-  SEA: 'SEA',
-  RIVER: 'RIVER',
-  WET_SAND: 'WET_SAND',
-  SAND: 'SAND',
-  DRY_SAND: 'DRY_SAND',
-  DRY_GRASS: 'DRY_GRASS',
-  GRASS: 'GRASS',
-  WET_GRASS: 'WET_GRASS',
-  MOUNTAIN_SNOW: 'MOUNTAIN_SNOW',
-  MOUNTAIN_ORE: 'MOUNTAIN_ORE',
-  MOUNTAIN: 'MOUNTAIN',
-  FOREST: 'FOREST'
-};
+import { terrainType } from './terrain-types.js'; 
 
 let physmap = null;
 let politicalMap = null;
 let currentMapSeeds = null;
 let cellSize = 3;
+
+// Настройки генерации по умолчанию
+let generationSettings = {
+    waterLevel: 0.2,
+    mountainThreshold: 0.55,
+    forestThreshold: 0.7,
+    numNations: 8,
+    settlementDensity: 1.0 // Плотность поселений (1.0 = 100%)
+};
 
 let currentGenerationScale = 1;
 export const MIN_GENERATION_SCALE = 0.5;
@@ -31,7 +25,7 @@ function calculateCellSizeForGenerationInternal() {
   const screenWidth = window.innerWidth;
   const screenHeight = window.innerHeight;
   const baseSize = Math.max(2, Math.min(4,
-    Math.floor(Math.min(screenWidth, screenHeight) / 250)));
+    Math.floor(Math.min(screenWidth, screenHeight) / 300)));
   return baseSize / currentGenerationScale;
 }
 
@@ -42,12 +36,17 @@ function getMapDataDimensionsInternal() {
   };
 }
 
-function initializeNoiseGenerators() {
-  const seeds = {
-    terrain: generateRandomSeed(), variant: generateRandomSeed(), biome: generateRandomSeed(),
-    detail: generateRandomSeed(), sand: generateRandomSeed(), mountain1: generateRandomSeed(),
-    mountain2: generateRandomSeed(), river: generateRandomSeed()
-  };
+function initializeNoiseGenerators(providedSeeds = null) {
+  let seeds;
+  if (providedSeeds) {
+      seeds = providedSeeds;
+  } else {
+      seeds = {
+        terrain: generateRandomSeed(), variant: generateRandomSeed(), biome: generateRandomSeed(),
+        detail: generateRandomSeed(), sand: generateRandomSeed(), mountain1: generateRandomSeed(),
+        mountain2: generateRandomSeed(), river: generateRandomSeed()
+      };
+  }
   currentMapSeeds = seeds; 
 
   const sandNoise = newFractalNoise({ noise: createNoise(seeds.sand), octaves: 10, frequency: 0.1, persistence: 0.01 });
@@ -199,7 +198,7 @@ function generateRivers(physmap, width, height, noise) {
             const cell = physmap[y][x];
             if (cell.continentId === undefined) continue;
 
-            if (cell.type === terrainType.MOUNTAIN || cell.type === terrainType.MOUNTAIN_ORE || cell.type === terrainType.HILLS || cell.type === terrainType.GRASS || cell.type === terrainType.WET_GRASS || cell.type === terrainType.DRY_GRASS) {
+            if (cell.type === terrainType.MOUNTAIN || cell.type === terrainType.MOUNTAIN_ORE || cell.type === 'HILLS' || cell.type === terrainType.GRASS || cell.type === terrainType.WET_GRASS || cell.type === terrainType.DRY_GRASS) {
                 if (!mountainsByContinent[cell.continentId]) mountainsByContinent[cell.continentId] = [];
                 mountainsByContinent[cell.continentId].push({ x, y });
             }
@@ -247,7 +246,7 @@ function generateRivers(physmap, width, height, noise) {
             [mountains[i], mountains[j]] = [mountains[j], mountains[i]];
         }
         
-        const numRivers = Math.min(mountains.length, Math.floor(mountains.length / 5000) + 1);
+        const numRivers = Math.min(mountains.length, Math.floor(mountains.length / 13000) + 1);
 
         for (let i = 0; i < numRivers; i++) {
             const start = mountains[i];
@@ -299,10 +298,10 @@ function generateRivers(physmap, width, height, noise) {
     }
 }
 
-export function generateNewPhysmapData() {
+export function generateNewPhysmapData(seeds = null) {
   cellSize = calculateCellSizeForGenerationInternal();
   const { width, height } = getMapDataDimensionsInternal();
-  const noise = initializeNoiseGenerators(); 
+  const noise = initializeNoiseGenerators(seeds); 
   const newMap = [];
   for (let y = 0; y < height; y++) {
     newMap[y] = [];
@@ -310,11 +309,14 @@ export function generateNewPhysmapData() {
       const terrainValue = noise.terrainNoise(x/100, y/100) + noise.detailNoise(x/20, y/20) * 0.15;
       const variantValue = noise.variantNoise(x/100, y/100);
       const sandValue = noise.sandNoise(x/50, y/50);
-      const localSandThreshold = 0.22 + sandValue * 0.01;
-      const isMountain = Math.max(noise.mountainNoise1(x/100, y/100), noise.mountainNoise2(x/100, y/100)) > 0.5;
+      
+      const localSandThreshold = generationSettings.waterLevel + 0.02 + sandValue * 0.01;
+      const isMountain = Math.max(noise.mountainNoise1(x/100, y/100), noise.mountainNoise2(x/100, y/100)) > generationSettings.mountainThreshold;
+      
       let info = { terrainValue };
-      if (terrainValue < 0) { info.color = '#003eb2'; info.type = terrainType.OCEAN; }
-      else if (terrainValue < 0.2) { info.color = '#0952c6'; info.type = terrainType.SEA; }
+      
+      if (terrainValue < generationSettings.waterLevel - 0.15) { info.color = '#003eb2'; info.type = terrainType.OCEAN; }
+      else if (terrainValue < generationSettings.waterLevel) { info.color = '#0952c6'; info.type = terrainType.SEA; }
       else if (terrainValue < localSandThreshold) {
         info.variantNoise = variantValue;
         if (variantValue < -0.2) { info.color = '#867645'; info.type = terrainType.WET_SAND; }
@@ -331,7 +333,8 @@ export function generateNewPhysmapData() {
         else if (variantValue < 0.2) { info.color = '#3c6114'; info.type = terrainType.GRASS; }
         else { info.color = '#5a7f32'; info.type = terrainType.WET_GRASS; }
       } else { info.color = '#203f00'; info.type = 'HILLS'; }
-      if (info.type === terrainType.GRASS && noise.detailNoise(x/10, y/10) > 0.7) {
+      
+      if (info.type === terrainType.GRASS && noise.detailNoise(x/10, y/10) > generationSettings.forestThreshold) {
         info.type = terrainType.FOREST; info.color = '#2d5a27';
       }
       newMap[y][x] = info;
@@ -350,8 +353,12 @@ export function generateAndStorePoliticalMap() {
         return false;
     }
     const { width, height } = getMapDataDimensionsInternal();
-    politicalMap = generatePoliticalLayer(physmap, currentMapSeeds, width, height);
+    politicalMap = generatePoliticalLayer(physmap, currentMapSeeds, width, height, generationSettings);
     return politicalMap !== null;
+}
+
+export function updateGenerationSettings(newSettings) {
+    generationSettings = { ...generationSettings, ...newSettings };
 }
 
 export function getPhysmap() {
@@ -360,6 +367,10 @@ export function getPhysmap() {
 
 export function getPoliticalMap() {
     return politicalMap;
+}
+
+export function getCurrentMapSeeds() {
+    return currentMapSeeds;
 }
 
 export function getCellSize() {
@@ -373,3 +384,5 @@ export function getGenerationScale() {
 export function setGenerationScale(newScale) {
   currentGenerationScale = Math.max(MIN_GENERATION_SCALE, Math.min(MAX_GENERATION_SCALE, newScale));
 }
+
+export { terrainType };
