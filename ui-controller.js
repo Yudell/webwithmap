@@ -1,6 +1,4 @@
-// ui-controller.js
-
-let politicalLayerButton, settlementsLayerButton, loadingOverlay;
+let politicalLayerButton, settlementsLayerButton, poiLayerButton, loadingOverlay;
 
 export function showLoading() {
     if (loadingOverlay) loadingOverlay.style.display = 'flex';
@@ -14,7 +12,7 @@ export function updateGenerationScaleDisplay(scale) {
     document.getElementById('scale-display').textContent = `${Math.round(scale * 100)}%`;
 }
 
-export function updateLayerButtonsState(isPoliticalMapVisible, isSettlementsLayerVisible, hasPoliticalData, hasMap) {
+export function updateLayerButtonsState(isPoliticalMapVisible, isSettlementsLayerVisible, isPoiLayerVisible, hasPoliticalData, hasMap) {
     const setButtonState = (button, isVisible, visibleText, hiddenText) => {
         if (button) {
             button.style.display = hasMap ? 'inline-block' : 'none';
@@ -23,12 +21,14 @@ export function updateLayerButtonsState(isPoliticalMapVisible, isSettlementsLaye
     };
     setButtonState(politicalLayerButton, isPoliticalMapVisible, 'Show Politics', 'Hide Politics');
     setButtonState(settlementsLayerButton, isSettlementsLayerVisible, 'Show Settlements', 'Hide Settlements');
+    setButtonState(poiLayerButton, isPoiLayerVisible, 'Show POI', 'Hide POI');
 }
 
 
 export function initializeUI(callbacks) {
     politicalLayerButton = document.getElementById('toggle-political-layer');
     settlementsLayerButton = document.getElementById('toggle-settlements-layer');
+    poiLayerButton = document.getElementById('toggle-poi-layer');
     loadingOverlay = document.getElementById('loading-overlay');
     const canvas = document.getElementById('map-canvas');
 
@@ -44,8 +44,28 @@ export function initializeUI(callbacks) {
 
     politicalLayerButton.addEventListener('click', () => callbacks.onLayerToggle('political'));
     settlementsLayerButton.addEventListener('click', () => callbacks.onLayerToggle('settlements'));
+    poiLayerButton.addEventListener('click', () => callbacks.onLayerToggle('poi'));
+    
+    const presetButtons = document.querySelectorAll('.preset-button');
+    presetButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            const preset = button.dataset.preset;
+            presetButtons.forEach(btn => btn.classList.remove('active-preset'));
+            button.classList.add('active-preset');
+            callbacks.onPresetChange(preset);
+        });
+    });
 
-    // Sliders
+    const paletteButtons = document.querySelectorAll('.palette-button');
+    paletteButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            const palette = button.dataset.palette;
+            paletteButtons.forEach(btn => btn.classList.remove('active-palette'));
+            button.classList.add('active-palette');
+            callbacks.onPaletteChange(palette);
+        });
+    });
+
     const sliders = [
         'water-level-slider', 'mountain-slider', 'forest-slider',
         'nation-slider', 'settlement-slider'
@@ -70,7 +90,7 @@ export function initializeUI(callbacks) {
         });
     });
     
-    updateSliderDisplays({ // Initial display update
+    updateSliderDisplays({
         waterLevel: document.getElementById('water-level-slider').value,
         mountainThreshold: document.getElementById('mountain-slider').value,
         forestThreshold: document.getElementById('forest-slider').value,
@@ -78,7 +98,6 @@ export function initializeUI(callbacks) {
         settlementDensity: document.getElementById('settlement-slider').value
     });
 
-    // Panning and Clicking
     let isPanning = false;
     let hasMoved = false;
     let lastPanX, lastPanY;
@@ -112,13 +131,11 @@ export function initializeUI(callbacks) {
         }
     });
 
-    // Menu toggle
     const controlsWrapper = document.querySelector('.controls-wrapper');
     document.getElementById('menu-toggle').addEventListener('click', () => {
         controlsWrapper.classList.toggle('expanded');
     });
 
-    // Menu tabs
     const tabButtons = document.querySelectorAll('.menu-tab-button');
     const contentPanels = document.querySelectorAll('.menu-content-panel');
     tabButtons.forEach(button => {

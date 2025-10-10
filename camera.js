@@ -1,5 +1,3 @@
-// camera.js
-
 let viewScale = 1.0;
 let viewTranslateX = 0;
 let viewTranslateY = 0;
@@ -40,16 +38,20 @@ function clampViewTranslate() {
     const scaledMapHeight = mapTotalWorldHeight * targetViewScale;
 
     if (scaledMapWidth < viewportWidth) {
-        targetViewTranslateX = Math.max(0, Math.min(targetViewTranslateX, viewportWidth - scaledMapWidth));
+        targetViewTranslateX = (viewportWidth - scaledMapWidth) / 2;
     } else {
         targetViewTranslateX = Math.max(viewportWidth - scaledMapWidth, Math.min(targetViewTranslateX, 0));
     }
 
     if (scaledMapHeight < viewportHeight) {
-        targetViewTranslateY = Math.max(0, Math.min(targetViewTranslateY, viewportHeight - scaledMapHeight));
+        targetViewTranslateY = (viewportHeight - scaledMapHeight) / 2;
     } else {
         targetViewTranslateY = Math.max(viewportHeight - scaledMapHeight, Math.min(targetViewTranslateY, 0));
     }
+}
+
+export function onResize() {
+    clampViewTranslate();
 }
 
 export function pan(dx, dy) {

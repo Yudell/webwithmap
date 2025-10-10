@@ -2,24 +2,92 @@ import { createNoise, newFractalNoise, defaultOctaves, defaultFrequency, default
 import { generatePoliticalLayer } from './political-map-gen.js';
 import { terrainType } from './terrain-types.js'; 
 
+function createSeededRandom(seed) {
+    let state = seed % 2147483647;
+    if (state <= 0) state += 2147483646;
+  
+    return function() {
+      state = (state * 16807) % 2147483647;
+      return (state - 1) / 2147483646;
+    };
+}
+
 let physmap = null;
 let politicalMap = null;
 let currentMapSeeds = null;
 let cellSize = 3;
+let currentMapPreset = 'CONTINENTS';
+let riverNetwork = [];
 
-// Настройки генерации по умолчанию
 let generationSettings = {
     waterLevel: 0.2,
     mountainThreshold: 0.55,
     forestThreshold: 0.7,
     numNations: 8,
-    settlementDensity: 1.0 // Плотность поселений (1.0 = 100%)
+    settlementDensity: 1.0
 };
 
 let currentGenerationScale = 1;
 export const MIN_GENERATION_SCALE = 0.5;
 export const MAX_GENERATION_SCALE = 5;
 export const GENERATION_SCALE_STEP = 0.5;
+
+function getColorForCellDefault(cell) {
+    switch(cell.type) {
+        case terrainType.OCEAN: return '#003eb2';
+        case terrainType.SEA: return '#0952c6';
+        case terrainType.RIVER: return '#2581c2';
+        case terrainType.WET_SAND: return '#867645';
+        case terrainType.SAND: return '#a49463';
+        case terrainType.DRY_SAND: return '#c2b281';
+        case terrainType.MOUNTAIN_SNOW: return '#ebebeb';
+        case terrainType.MOUNTAIN_ORE: return '#8c8e7b';
+        case terrainType.MOUNTAIN: return '#a0a28f';
+        case terrainType.DRY_GRASS: return '#284d00';
+        case terrainType.GRASS: return '#3c6114';
+        case terrainType.WET_GRASS: return '#5a7f32';
+        case terrainType.FOREST: return '#203f00';
+        default: return '#000000';
+    }
+}
+
+function getColorForCellOklch(cell) {
+    const variantValue = cell.variantNoise || 0;
+    switch(cell.type) {
+        case terrainType.OCEAN: return `oklch(${25 + variantValue * 2}% 0.1 230)`;
+        case terrainType.SEA: return `oklch(${40 + variantValue * 4}% 0.12 220)`;
+        case terrainType.RIVER: return 'oklch(55% 0.15 215)';
+        case terrainType.WET_SAND: return `oklch(75% 0.08 90)`;
+        case terrainType.SAND: return `oklch(${85 + variantValue * 8}% 0.09 90)`;
+        case terrainType.DRY_SAND: return `oklch(92% 0.07 90)`;
+        case terrainType.MOUNTAIN_SNOW: return `oklch(98% 0.005 100)`;
+        case terrainType.MOUNTAIN_ORE: return `oklch(${60 + variantValue * 5}% 0.05 70)`;
+        case terrainType.MOUNTAIN: return `oklch(${65 + variantValue * 5}% 0.03 100)`;
+        case terrainType.DRY_GRASS: return `oklch(${70 + variantValue * 4}% 0.12 110)`;
+        case terrainType.GRASS: return `oklch(${65 + variantValue * 4}% 0.15 130)`;
+        case terrainType.WET_GRASS: return `oklch(${60 + variantValue * 4}% 0.14 140)`;
+        case terrainType.FOREST: return `oklch(${45 + variantValue * 3}% 0.16 135)`;
+        default: return '#000000';
+    }
+}
+
+function assignCellColor(cell, palette) {
+    if (palette === 'oklch') {
+        cell.color = getColorForCellOklch(cell);
+    } else {
+        cell.color = getColorForCellDefault(cell);
+    }
+}
+
+export function recalculatePhysmapColors(palette) {
+    if (!physmap) return;
+    for (let y = 0; y < physmap.length; y++) {
+        for (let x = 0; x < physmap[0].length; x++) {
+            assignCellColor(physmap[y][x], palette);
+        }
+    }
+}
+
 
 function calculateCellSizeForGenerationInternal() {
   const screenWidth = window.innerWidth;
@@ -44,7 +112,7 @@ function initializeNoiseGenerators(providedSeeds = null) {
       seeds = {
         terrain: generateRandomSeed(), variant: generateRandomSeed(), biome: generateRandomSeed(),
         detail: generateRandomSeed(), sand: generateRandomSeed(), mountain1: generateRandomSeed(),
-        mountain2: generateRandomSeed(), river: generateRandomSeed()
+        mountain2: generateRandomSeed(), river: generateRandomSeed(), island: generateRandomSeed()
       };
   }
   currentMapSeeds = seeds; 
@@ -58,7 +126,8 @@ function initializeNoiseGenerators(providedSeeds = null) {
     mountainNoise2: newFractalNoise({ noise: createNoise(seeds.mountain2), octaves: defaultOctaves, frequency: defaultFrequency, persistence: defaultPersistence }),
     sandNoise,
     riverNoise: newFractalNoise({ noise: createNoise(seeds.river), octaves: 6, frequency: 0.5, persistence: 0.5 }),
-    riverJitterNoise: newFractalNoise({ noise: createNoise(seeds.river ^ seeds.detail), octaves: 5, frequency: 1.8, persistence: 0.4 })
+    riverJitterNoise: newFractalNoise({ noise: createNoise(seeds.river ^ seeds.detail), octaves: 5, frequency: 1.8, persistence: 0.4 }),
+    islandNoise: newFractalNoise({ noise: createNoise(seeds.island), octaves: 6, frequency: 0.4, persistence: 0.5 })
   };
 }
 
@@ -120,7 +189,7 @@ function labelWaterBodies(physmap, width, height) {
                             const ny = pos.y + dy;
                             if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
                                 const neighborCell = physmap[ny][nx];
-                                const isNeighborWater = neighborCell.type === terrainType.OCEAN || neighborCell.type === terrainType.SEA;
+                                const isNeighborWater = neighborCell.type !== terrainType.OCEAN || neighborCell.type !== terrainType.SEA;
                                 if (isNeighborWater && neighborCell.waterBodyId === undefined) {
                                     neighborCell.waterBodyId = waterBodyId;
                                     currentSize++;
@@ -167,7 +236,8 @@ function generateWarpedLine(start, end, noise, depth, points) {
     generateWarpedLine({ x: newMidX, y: newMidY }, end, noise, depth - 1, points);
 }
 
-function drawLineOnGrid(p1, p2, gridSet) {
+function bresenhamLine(p1, p2) {
+    const points = [];
     let x1 = Math.floor(p1.x), y1 = Math.floor(p1.y);
     const x2 = Math.floor(p2.x), y2 = Math.floor(p2.y);
     const dx = Math.abs(x2 - x1);
@@ -176,15 +246,18 @@ function drawLineOnGrid(p1, p2, gridSet) {
     const sy = y1 < y2 ? 1 : -1;
     let err = dx + dy;
     while (true) {
-        gridSet.add(`${x1},${y1}`);
+        points.push({ x: x1, y: y1 });
         if (x1 === x2 && y1 === y2) break;
         let e2 = 2 * err;
         if (e2 >= dy) { err += dy; x1 += sx; }
         if (e2 <= dx) { err += dx; y1 += sy; }
     }
+    return points;
 }
 
 function generateRivers(physmap, width, height, noise) {
+    const random = createSeededRandom(currentMapSeeds.river);
+
     labelContinents(physmap, width, height);
     const waterBodySizes = labelWaterBodies(physmap, width, height);
 
@@ -198,7 +271,7 @@ function generateRivers(physmap, width, height, noise) {
             const cell = physmap[y][x];
             if (cell.continentId === undefined) continue;
 
-            if (cell.type === terrainType.MOUNTAIN || cell.type === terrainType.MOUNTAIN_ORE || cell.type === 'HILLS' || cell.type === terrainType.GRASS || cell.type === terrainType.WET_GRASS || cell.type === terrainType.DRY_GRASS) {
+            if (cell.type === terrainType.MOUNTAIN || cell.type === terrainType.MOUNTAIN_ORE || cell.type === 'FOREST' || cell.type === terrainType.GRASS || cell.type === terrainType.WET_GRASS || cell.type === terrainType.DRY_GRASS) {
                 if (!mountainsByContinent[cell.continentId]) mountainsByContinent[cell.continentId] = [];
                 mountainsByContinent[cell.continentId].push({ x, y });
             }
@@ -229,8 +302,6 @@ function generateRivers(physmap, width, height, noise) {
             }
         }
     }
-
-    const allRiverCells = new Set();
     
     for (const continentId in mountainsByContinent) {
         const mountains = mountainsByContinent[continentId];
@@ -242,7 +313,7 @@ function generateRivers(physmap, width, height, noise) {
         if (!coasts || coasts.length === 0) continue;
 
         for (let i = mountains.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
+            const j = Math.floor(random() * (i + 1));
             [mountains[i], mountains[j]] = [mountains[j], mountains[i]];
         }
         
@@ -274,69 +345,116 @@ function generateRivers(physmap, width, height, noise) {
                 });
 
                 if (validEndPoints.length > 0) {
-                    const end = validEndPoints[Math.floor(Math.random() * validEndPoints.length)];
+                    const end = validEndPoints[Math.floor(random() * validEndPoints.length)];
                     riverMouths.push(end);
                     
                     const points = [start];
                     generateWarpedLine(start, end, noise, 10, points);
                     
+                    const completeRiverPath = [];
                     for (let j = 0; j < points.length - 1; j++) {
-                        drawLineOnGrid(points[j], points[j+1], allRiverCells);
+                        const segment = bresenhamLine(points[j], points[j+1]);
+                        if (j > 0) segment.shift();
+                        completeRiverPath.push(...segment);
+                    }
+                    if (completeRiverPath.length > 0) {
+                        riverNetwork.push(completeRiverPath);
                     }
                 }
             }
         }
     }
 
-    for (const key of allRiverCells) {
-        const [x, y] = key.split(',').map(Number);
-        const cell = physmap[y]?.[x];
-        if (cell && cell.type !== terrainType.OCEAN && cell.type !== terrainType.SEA) {
-            cell.type = terrainType.RIVER;
-            cell.color = '#2581c2';
+    for (const path of riverNetwork) {
+        for (const point of path) {
+            const cell = physmap[point.y]?.[point.x];
+            if (cell && cell.type !== terrainType.OCEAN && cell.type !== terrainType.SEA) {
+                cell.type = terrainType.RIVER;
+            }
         }
     }
 }
 
-export function generateNewPhysmapData(seeds = null) {
+export function generateNewPhysmapData(seeds = null, palette = 'default') {
   cellSize = calculateCellSizeForGenerationInternal();
   const { width, height } = getMapDataDimensionsInternal();
   const noise = initializeNoiseGenerators(seeds); 
   const newMap = [];
+  riverNetwork = [];
+
+  const centerX = width / 2;
+  const centerY = height / 2;
+  const maxDist = Math.sqrt(centerX * centerX + centerY * centerY);
+
   for (let y = 0; y < height; y++) {
     newMap[y] = [];
     for (let x = 0; x < width; x++) {
-      const terrainValue = noise.terrainNoise(x/100, y/100) + noise.detailNoise(x/20, y/20) * 0.15;
+      let terrainValue = noise.terrainNoise(x/100, y/100) + noise.detailNoise(x/20, y/20) * 0.15;
+      
+      const dx = x - centerX;
+      const dy = y - centerY;
+      const distFromCenter = Math.sqrt(dx * dx + dy * dy);
+      const normalizedDist = distFromCenter / maxDist;
+
+      switch (currentMapPreset) {
+          case 'PANGAEA': {
+              const gradient = 1.0 - (normalizedDist * normalizedDist);
+              terrainValue += gradient * 0.5;
+              break;
+          }
+          case 'MEDITERRANEAN': {
+              const landBoost = normalizedDist * 0.8;
+              const seaCarve = (1.0 - normalizedDist) * 0.1;
+              terrainValue = terrainValue + landBoost - seaCarve;
+              break;
+          }
+          case 'ARCHIPELAGO': {
+              const islandMask = (noise.islandNoise(x / 35, y / 35) + 1) / 2;
+              const contrastMask = Math.pow(islandMask, 2.2); 
+              terrainValue = terrainValue - contrastMask; 
+              break;
+          }
+      }
+
       const variantValue = noise.variantNoise(x/100, y/100);
       const sandValue = noise.sandNoise(x/50, y/50);
       
       const localSandThreshold = generationSettings.waterLevel + 0.02 + sandValue * 0.01;
-      const isMountain = Math.max(noise.mountainNoise1(x/100, y/100), noise.mountainNoise2(x/100, y/100)) > generationSettings.mountainThreshold;
       
-      let info = { terrainValue };
+   
+      const uplift = (noise.mountainNoise1(x / 350, y / 350) + 1) / 2;
+      const mountainCore = Math.pow(uplift, 3.0);
+
+      const warpX = noise.variantNoise(x / 90, y / 90) * 50;
+      const warpY = noise.variantNoise(y / 90, x / 90) * 50;
       
-      if (terrainValue < generationSettings.waterLevel - 0.15) { info.color = '#003eb2'; info.type = terrainType.OCEAN; }
-      else if (terrainValue < generationSettings.waterLevel) { info.color = '#0952c6'; info.type = terrainType.SEA; }
+      const ridgeNoise = noise.mountainNoise2((x + warpX) / 70, (y + warpY) / 70);
+      const ridgeStructure = 1.0 - (ridgeNoise * ridgeNoise);
+
+      const finalMountainValue = ridgeStructure * mountainCore;
+      
+
+      const threshold = 0.2 + (generationSettings.mountainThreshold - 0.4) * 1.0;
+      const isMountain = finalMountainValue > threshold;
+
+      let info = { terrainValue, variantNoise: variantValue };
+      
+      if (terrainValue < generationSettings.waterLevel - 0.15) { info.type = terrainType.OCEAN; }
+      else if (terrainValue < generationSettings.waterLevel) { info.type = terrainType.SEA; }
       else if (terrainValue < localSandThreshold) {
-        info.variantNoise = variantValue;
-        if (variantValue < -0.2) { info.color = '#867645'; info.type = terrainType.WET_SAND; }
-        else if (variantValue < 0.2) { info.color = '#a49463'; info.type = terrainType.SAND; }
-        else { info.color = '#c2b281'; info.type = terrainType.DRY_SAND; }
+        if (variantValue < -0.2) { info.type = terrainType.WET_SAND; }
+        else if (variantValue < 0.2) { info.type = terrainType.SAND; }
+        else { info.type = terrainType.DRY_SAND; }
       } else if (isMountain && terrainValue > 0.3) {
-        info.variantNoise = variantValue;
-        if (variantValue < -0.2) { info.color = '#ebebeb'; info.type = terrainType.MOUNTAIN_SNOW; }
-        else if (variantValue < 0.2) { info.color = '#8c8e7b'; info.type = terrainType.MOUNTAIN_ORE; }
-        else { info.color = '#a0a28f'; info.type = terrainType.MOUNTAIN; }
-      } else if (terrainValue < 0.5) {
-        info.variantNoise = variantValue;
-        if (variantValue < -0.2) { info.color = '#284d00'; info.type = terrainType.DRY_GRASS; }
-        else if (variantValue < 0.2) { info.color = '#3c6114'; info.type = terrainType.GRASS; }
-        else { info.color = '#5a7f32'; info.type = terrainType.WET_GRASS; }
-      } else { info.color = '#203f00'; info.type = 'HILLS'; }
+        if (variantValue < -0.2) { info.type = terrainType.MOUNTAIN_SNOW; }
+        else if (variantValue < 0.2) { info.type = terrainType.MOUNTAIN_ORE; }
+        else { info.type = terrainType.MOUNTAIN; }
+      } else if (terrainValue < generationSettings.forestThreshold) {
+        if (variantValue < -0.2) { info.type = terrainType.DRY_GRASS; }
+        else if (variantValue < 0.2) { info.type = terrainType.GRASS; }
+        else { info.type = terrainType.WET_GRASS; }
+      } else { info.type = 'FOREST'; }
       
-      if (info.type === terrainType.GRASS && noise.detailNoise(x/10, y/10) > generationSettings.forestThreshold) {
-        info.type = terrainType.FOREST; info.color = '#2d5a27';
-      }
       newMap[y][x] = info;
     }
   }
@@ -344,6 +462,9 @@ export function generateNewPhysmapData(seeds = null) {
   generateRivers(newMap, width, height, noise);
   
   physmap = newMap;
+  
+  recalculatePhysmapColors(palette);
+
   politicalMap = null; 
 }
 
@@ -373,6 +494,10 @@ export function getCurrentMapSeeds() {
     return currentMapSeeds;
 }
 
+export function getRiverNetwork() {
+    return riverNetwork;
+}
+
 export function getCellSize() {
   return cellSize;
 }
@@ -383,6 +508,10 @@ export function getGenerationScale() {
 
 export function setGenerationScale(newScale) {
   currentGenerationScale = Math.max(MIN_GENERATION_SCALE, Math.min(MAX_GENERATION_SCALE, newScale));
+}
+
+export function setMapPreset(preset) {
+    currentMapPreset = preset;
 }
 
 export { terrainType };

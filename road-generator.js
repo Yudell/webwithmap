@@ -1,11 +1,7 @@
-// road-generator.js
-
 import { createNoise } from './mapgen.js';
 import { terrainType } from './terrain-types.js';
 
-// --- ЧАСТЬ 1: Настройки и константы ---
 
-// Стоимость передвижения по разным типам биомов
 const TERRAIN_COSTS = {
     [terrainType.GRASS]: 1,
     [terrainType.WET_GRASS]: 1.5,
@@ -23,37 +19,68 @@ const TERRAIN_COSTS = {
     [terrainType.SEA]: Infinity
 };
 
-// Стоимость клетки, где уже есть дорога (чтобы новые дороги "прилипали" к старым)
 const ROAD_COST = 0.1;
 
-// --- ИЗМЕНЕНО: Гораздо более агрессивные настройки для кривых дорог ---
-const ROAD_INTERFERENCE_NOISE_SCALE = 0.4; // Шум стал "мельче", заставляя дорогу чаще вилять
-const ROAD_INTERFERENCE_STRENGTH = 20.0;   // Сила шума увеличена в 10 раз! Прямой путь становится невыгодным.
-const WATER_GRAVITY_STRENGTH = 0.8;       // Сила притяжения к воде остается прежней
+const ROAD_INTERFERENCE_NOISE_SCALE = 0.4;
+const ROAD_INTERFERENCE_STRENGTH = 20.0;
+const WATER_GRAVITY_STRENGTH = 0.8;
 
-// Настройки для промежуточных точек (Waypoints)
-const WAYPOINT_MIN_DISTANCE = 50;         // Минимальная длина дороги для добавления waypoints
-const WAYPOINT_DENSITY = 30;             // Примерное расстояние между waypoints
-const WAYPOINT_MAX_DEVIATION_FACTOR = 0.25; // Максимальное отклонение от прямой (25% от длины)
+const WAYPOINT_MIN_DISTANCE = 50;
+const WAYPOINT_DENSITY = 30;
+const WAYPOINT_MAX_DEVIATION_FACTOR = 0.25;
 
 
-// --- ЧАСТЬ 2: Реализация алгоритма A* с очередью с приоритетом (без изменений) ---
 
-class PriorityQueue {
+class MinHeap {
     constructor() {
-        this.elements = [];
+        this.heap = [];
     }
-    enqueue(element, priority) {
-        this.elements.push({ element, priority });
-        this.elements.sort((a, b) => a.priority - b.priority);
+    getParentIndex(i) { return Math.floor((i - 1) / 2); }
+    getLeftChildIndex(i) { return 2 * i + 1; }
+    getRightChildIndex(i) { return 2 * i + 2; }
+    hasParent(i) { return this.getParentIndex(i) >= 0; }
+    hasLeftChild(i) { return this.getLeftChildIndex(i) < this.heap.length; }
+    hasRightChild(i) { return this.getRightChildIndex(i) < this.heap.length; }
+    swap(i1, i2) {
+        [this.heap[i1], this.heap[i2]] = [this.heap[i2], this.heap[i1]];
     }
-    dequeue() {
-        return this.elements.shift().element;
+    peek() { return this.heap.length > 0 ? this.heap[0] : null; }
+    add(item) {
+        this.heap.push(item);
+        this.heapifyUp();
     }
-    isEmpty() {
-        return this.elements.length === 0;
+    poll() {
+        if (this.heap.length === 0) return null;
+        if (this.heap.length === 1) return this.heap.pop();
+        const item = this.heap[0];
+        this.heap[0] = this.heap.pop();
+        this.heapifyDown();
+        return item;
     }
+    heapifyUp() {
+        let index = this.heap.length - 1;
+        while (this.hasParent(index) && this.heap[this.getParentIndex(index)].priority > this.heap[index].priority) {
+            this.swap(this.getParentIndex(index), index);
+            index = this.getParentIndex(index);
+        }
+    }
+    heapifyDown() {
+        let index = 0;
+        while (this.hasLeftChild(index)) {
+            let smallerChildIndex = this.getLeftChildIndex(index);
+            if (this.hasRightChild(index) && this.heap[this.getRightChildIndex(index)].priority < this.heap[smallerChildIndex].priority) {
+                smallerChildIndex = this.getRightChildIndex(index);
+            }
+            if (this.heap[index].priority <= this.heap[smallerChildIndex].priority) {
+                break;
+            }
+            this.swap(index, smallerChildIndex);
+            index = smallerChildIndex;
+        }
+    }
+    isEmpty() { return this.heap.length === 0; }
 }
+
 
 function heuristic(a, b) {
     return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
@@ -63,14 +90,15 @@ function findPath(start, end, costMap, width, height) {
     const startNode = `${start.x},${start.y}`;
     const endNode = `${end.x},${end.y}`;
 
-    const frontier = new PriorityQueue();
-    frontier.enqueue(startNode, 0);
+    const frontier = new MinHeap();
+    frontier.add({ element: startNode, priority: 0 });
 
     const cameFrom = { [startNode]: null };
     const costSoFar = { [startNode]: 0 };
 
     while (!frontier.isEmpty()) {
-        const currentKey = frontier.dequeue();
+        const current = frontier.poll();
+        const currentKey = current.element;
         
         if (currentKey === endNode) {
             const path = [];
@@ -103,7 +131,7 @@ function findPath(start, end, costMap, width, height) {
                     if (!(neighborKey in costSoFar) || newCost < costSoFar[neighborKey]) {
                         costSoFar[neighborKey] = newCost;
                         const priority = newCost + heuristic({x: neighborX, y: neighborY}, end);
-                        frontier.enqueue(neighborKey, priority);
+                        frontier.add({ element: neighborKey, priority: priority });
                         cameFrom[neighborKey] = currentKey;
                     }
                 }
@@ -114,10 +142,8 @@ function findPath(start, end, costMap, width, height) {
 }
 
 
-// --- ЧАСТЬ 3: Создание комплексной карты стоимости (без изменений) ---
 
 function createCostMap(physmap, seeds, width, height) {
-    console.time("Cost map generation");
     const costMap = Array.from({ length: height }, () => new Array(width).fill(0));
     const interferenceNoise = createNoise(seeds.terrain ^ 0xABCDEF);
 
@@ -170,11 +196,9 @@ function createCostMap(physmap, seeds, width, height) {
             }
         }
     }
-    console.timeEnd("Cost map generation");
     return costMap;
 }
 
-// --- ЧАСТЬ 4: Построение MST и ГЕНЕРАЦИЯ WAYPOINTS ---
 
 class DSU {
     constructor(n) { this.parent = Array.from({length: n}, (_, i) => i); }
@@ -220,14 +244,13 @@ function buildRoadNetworkMST(settlements) {
     return mstEdges;
 }
 
-// --- НОВАЯ ФУНКЦИЯ: Генерация промежуточных точек ---
 function generateWaypoints(start, end, costMap, width, height) {
     const dx = end.x - start.x;
     const dy = end.y - start.y;
     const distance = Math.sqrt(dx*dx + dy*dy);
 
     if (distance < WAYPOINT_MIN_DISTANCE) {
-        return []; // Дорога слишком короткая для waypoints
+        return [];
     }
 
     const numWaypoints = Math.floor(distance / WAYPOINT_DENSITY);
@@ -235,7 +258,6 @@ function generateWaypoints(start, end, costMap, width, height) {
     
     const waypoints = [];
     
-    // Вектор направления и перпендикулярный ему вектор
     const mainVec = { x: dx / distance, y: dy / distance };
     const perpVec = { x: -mainVec.y, y: mainVec.x };
 
@@ -246,7 +268,6 @@ function generateWaypoints(start, end, costMap, width, height) {
             y: start.y + dy * progress
         };
         
-        // Случайное смещение вдоль перпендикуляра
         const deviation = (Math.random() - 0.5) * 2 * distance * WAYPOINT_MAX_DEVIATION_FACTOR;
         
         let waypoint = {
@@ -254,11 +275,9 @@ function generateWaypoints(start, end, costMap, width, height) {
             y: Math.round(pointOnLine.y + perpVec.y * deviation)
         };
         
-        // Проверяем, чтобы точка не попала в воду или за пределы карты
         waypoint.x = Math.max(0, Math.min(width - 1, waypoint.x));
         waypoint.y = Math.max(0, Math.min(height - 1, waypoint.y));
 
-        // Если точка попала в воду, пытаемся найти ближайшую сушу (простой поиск)
         let attempts = 0;
         while(costMap[waypoint.y]?.[waypoint.x] === Infinity && attempts < 25) {
             const searchDX = Math.floor(Math.random() * 11) - 5;
@@ -276,62 +295,65 @@ function generateWaypoints(start, end, costMap, width, height) {
     return waypoints;
 }
 
-// --- ЧАСТЬ 5: Главная управляющая функция (переписана для работы с waypoints) ---
+function findFullPath(start, end, costMap, width, height) {
+    const waypoints = generateWaypoints(start, end, costMap, width, height);
+    const stops = [start, ...waypoints, end];
+    let fullPath = [];
+    
+    for (let i = 0; i < stops.length - 1; i++) {
+        const segmentStart = stops[i];
+        const segmentEnd = stops[i+1];
+        
+        const segmentPath = findPath(segmentStart, segmentEnd, costMap, width, height);
+        
+        if (segmentPath) {
+            fullPath = fullPath.concat(i > 0 ? segmentPath.slice(1) : segmentPath);
+        } else {
+            return null;
+        }
+    }
+    return fullPath.length > 0 ? fullPath : null;
+}
+
+
 
 export function generateRoadNetwork(physmap, politicalMap, seeds, width, height) {
     console.time("Total road generation");
     if (!politicalMap || !politicalMap.nations) return [];
 
+    const costMap = createCostMap(physmap, seeds, width, height);
+    const allPaths = [];
+
     const majorSettlements = [];
     politicalMap.nations.forEach(nation => {
         if (nation.capital) {
-            majorSettlements.push({ ...nation.capital, id: `cap_${nation.id}` });
+            majorSettlements.push(nation.capital);
         }
         nation.settlements?.forEach(s => {
             if (s.type === 'city') {
-                majorSettlements.push({ ...s, id: `city_${s.name}` });
+                majorSettlements.push(s);
             }
         });
     });
 
-    if (majorSettlements.length < 2) return [];
-
-    const costMap = createCostMap(physmap, seeds, width, height);
-    const roadConnections = buildRoadNetworkMST(majorSettlements);
+    if (majorSettlements.length < 2) {
+        console.timeEnd("Total road generation");
+        return []; 
+    }
     
-    const allPaths = [];
+    const roadConnections = buildRoadNetworkMST(majorSettlements);
+
     for (const connection of roadConnections) {
-        // Генерируем промежуточные точки для каждого соединения
-        const waypoints = generateWaypoints(connection.start, connection.end, costMap, width, height);
-        const stops = [connection.start, ...waypoints, connection.end];
-        
-        let fullPath = [];
-        
-        // Строим путь по сегментам: от точки к точке
-        for (let i = 0; i < stops.length - 1; i++) {
-            const segmentStart = stops[i];
-            const segmentEnd = stops[i+1];
+        const path = findFullPath(connection.start, connection.end, costMap, width, height);
+        if (path) {
+            allPaths.push(path);
             
-            const segmentPath = findPath(segmentStart, segmentEnd, costMap, width, height);
-            
-            if (segmentPath) {
-                // Добавляем сегмент к общему пути (удаляя дубликат начальной точки)
-                fullPath = fullPath.concat(i > 0 ? segmentPath.slice(1) : segmentPath);
-            } else {
-                // Если сегмент не построился, прерываем создание этой дороги
-                fullPath = [];
-                break;
-            }
-        }
-        
-        if (fullPath.length > 0) {
-            allPaths.push(fullPath);
-            // Снижаем стоимость клеток на проложенном пути, чтобы другие дороги к нему "прилипали"
-            for (const point of fullPath) {
+            for (const point of path) {
                 costMap[point.y][point.x] = ROAD_COST;
             }
         }
     }
+    
     console.timeEnd("Total road generation");
     return allPaths;
 }

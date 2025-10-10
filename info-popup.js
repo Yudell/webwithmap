@@ -19,9 +19,8 @@ function hideInfoPopup() {
 function showInfoPopup(nation) {
     if (!nation || !nationInfoPopup) return;
 
-    // Формируем HTML для детальной информации
     nationNameEl.textContent = `${nation.name} (${nation.formOfGovernment})`;
-    nationColorPicker.value = nation.color; // Устанавливаем цвет пикера
+    nationColorPicker.value = nation.color;
     
     const cityCount = nation.settlements?.filter(s => s.type === 'city').length || 0;
     const villageCount = nation.settlements?.filter(s => s.type === 'village').length || 0;
@@ -44,7 +43,6 @@ function showInfoPopup(nation) {
 
     nationDetailsEl.innerHTML = detailsHTML;
 
-    // Показываем окно
     nationInfoPopup.style.display = 'block';
     
     nationInfoPopup.style.left = '15px';

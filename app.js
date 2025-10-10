@@ -1,10 +1,9 @@
-// app.js
-
 import {
   generateNewPhysmapData, getPhysmap, getCellSize, getGenerationScale,
   setGenerationScale, MIN_GENERATION_SCALE, MAX_GENERATION_SCALE,
   GENERATION_SCALE_STEP, generateAndStorePoliticalMap, getPoliticalMap,
-  getCurrentMapSeeds, updateGenerationSettings 
+  getCurrentMapSeeds, updateGenerationSettings, setMapPreset, getRiverNetwork,
+  recalculatePhysmapColors
 } from './map-data.js';
 import * as renderer from './renderer.js';
 import * as camera from './camera.js';
@@ -13,15 +12,41 @@ import { initializeInfoPopup, showInfoPopup, hideInfoPopup, isPopupOpenForNation
 
 let isPoliticalMapVisible = false;
 let isSettlementsLayerVisible = false;
+let isPoiLayerVisible = false;
+let currentPalette = 'default';
 let nationLookup = null;
-let resizeTimeout;
+
+function getSeedFromURL() {
+    const params = new URLSearchParams(window.location.search);
+    const seedString = params.get('seed');
+    if (!seedString) return null;
+
+    try {
+        const seeds = JSON.parse(atob(seedString.trim()));
+        if (seeds && seeds.terrain) {
+            return seeds;
+        }
+        console.warn('Invalid seed format in URL.');
+        return null;
+    } catch (error) {
+        console.error('Failed to parse seed from URL:', error);
+        return null;
+    }
+}
+
+function updateURLWithSeed(seeds) {
+    if (!seeds) return;
+    const seedString = btoa(JSON.stringify(seeds));
+    const url = new URL(window.location);
+    url.searchParams.set('seed', seedString);
+    window.history.replaceState({}, '', url);
+}
 
 function updateNationColor(nationId, newColor) {
     if (!nationLookup) return;
     const nation = nationLookup.get(nationId);
     if (nation) {
         nation.color = newColor;
-        // --- ИЗМЕНЕНО: Инвалидируем только политический кэш ---
         renderer.markPoliticalCachesDirty();
     }
 }
@@ -34,20 +59,22 @@ function fullStateUpdate() {
         height: physmap ? physmap.length : 0,
         cellSize: getCellSize()
     });
-    ui.updateLayerButtonsState(isPoliticalMapVisible, isSettlementsLayerVisible, !!politicalMap, !!physmap);
+    ui.updateLayerButtonsState(isPoliticalMapVisible, isSettlementsLayerVisible, isPoiLayerVisible, !!politicalMap, !!physmap);
     ui.updateGenerationScaleDisplay(getGenerationScale());
 }
 
 function regenerateMapAndView(seeds = null) {
     ui.showLoading();
     setTimeout(() => {
-        generateNewPhysmapData(seeds);
+        generateNewPhysmapData(seeds, currentPalette);
+        updateURLWithSeed(getCurrentMapSeeds());
+
         nationLookup = null; 
         camera.resetCamera();
         isPoliticalMapVisible = false;
         isSettlementsLayerVisible = false;
+        isPoiLayerVisible = false;
         hideInfoPopup();
-        // --- ИЗМЕНЕНО: Инвалидируем все кэши ---
         renderer.markAllCachesDirty();
         fullStateUpdate();
         ui.hideLoading();
@@ -65,17 +92,32 @@ function regeneratePoliticalLayerViewOnly() {
             }
             isPoliticalMapVisible = true;
             isSettlementsLayerVisible = true;
+            isPoiLayerVisible = true;
             hideInfoPopup(); 
         }
-        // --- ИЗМЕНЕНО: Инвалидируем политический и поселенческий кэши ---
         renderer.markPoliticalCachesDirty();
         fullStateUpdate();
         ui.hideLoading();
     }, 50);
 }
 
+function handlePaletteChange(newPalette) {
+    if (currentPalette === newPalette || !getPhysmap()) return;
+    
+    currentPalette = newPalette;
+    
+    recalculatePhysmapColors(newPalette);
+
+    renderer.markAllCachesDirty();
+}
+
+
 const callbacks = {
     onGenerateMap: () => regenerateMapAndView(),
+    onPresetChange: (preset) => {
+        setMapPreset(preset);
+        regenerateMapAndView(getCurrentMapSeeds());
+    },
     onDownloadMap: () => {
         const currentPhysmap = getPhysmap();
         if (!currentPhysmap) return;
@@ -89,10 +131,10 @@ const callbacks = {
         tempCanvas.height = mapDataHeight * downloadCellPixelSize;
         tempCtx.imageSmoothingEnabled = false;
 
-        // --- ИЗМЕНЕНО: Теперь для скачивания мы рисуем все слои последовательно ---
-        renderer.drawCompleteMap(tempCtx, currentPhysmap, getPoliticalMap(), {
+        renderer.drawCompleteMap(tempCtx, currentPhysmap, getPoliticalMap(), getRiverNetwork(), {
             cellSize: downloadCellPixelSize,
-            drawBaseTerrain: true, // Начинаем с чистого ландшафта
+            drawBaseTerrain: true,
+            drawRivers: true,
             drawPoliticalLayer: isPoliticalMapVisible,
             drawRoads: isSettlementsLayerVisible,
             drawSettlements: isSettlementsLayerVisible,
@@ -145,16 +187,11 @@ const callbacks = {
     },
     onLayerToggle: (layerType) => {
         if (!getPhysmap()) return;
-
-        // --- ИЗМЕНЕНО: Логика стала значительно проще ---
         const needsData = !getPoliticalMap();
 
         if (needsData) {
-            // Если данных нет, генерируем их (это также обновит кэши)
             regeneratePoliticalLayerViewOnly();
         } else {
-            // Если данные есть, просто переключаем флаг видимости.
-            // Перерисовка кэша не нужна, render loop сам подхватит изменение.
             if (layerType === 'political') {
                 isPoliticalMapVisible = !isPoliticalMapVisible;
                 if (!isPoliticalMapVisible) hideInfoPopup();
@@ -162,10 +199,13 @@ const callbacks = {
             if (layerType === 'settlements') {
                 isSettlementsLayerVisible = !isSettlementsLayerVisible;
             }
-            // Обновляем только состояние кнопок в UI
+            if (layerType === 'poi') {
+                isPoiLayerVisible = !isPoiLayerVisible;
+            }
             fullStateUpdate();
         }
     },
+    onPaletteChange: handlePaletteChange,
     onSliderChange: (settings, isPhysmapChange) => {
         updateGenerationSettings(settings);
         if (isPhysmapChange) {
@@ -202,12 +242,12 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeInfoPopup({ onColorChange: updateNationColor });
     setGenerationScale(1.0);
     
-    regenerateMapAndView(); 
+    const seedFromURL = getSeedFromURL();
+    regenerateMapAndView(seedFromURL); 
 
-    renderer.startRenderLoop(() => ({ isPoliticalMapVisible, isSettlementsLayerVisible }));
+    renderer.startRenderLoop(() => ({ isPoliticalMapVisible, isSettlementsLayerVisible, isPoiLayerVisible }));
 
     window.addEventListener('resize', () => {
-        clearTimeout(resizeTimeout);
-        resizeTimeout = setTimeout(() => regenerateMapAndView(getCurrentMapSeeds()), 250);
+        camera.onResize();
     });
 });
