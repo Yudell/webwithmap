@@ -65,6 +65,95 @@ class MinHeap {
     }
 }
 
+function findBestLabelPosition(nationId, nationMap, mapWidth, mapHeight) {
+    const dist = Array.from({ length: mapHeight }, () => new Array(mapWidth).fill(0));
+
+    // Initialize distances: 0 for borders/outside, Infinity for inside
+    for (let y = 0; y < mapHeight; y++) {
+        for (let x = 0; x < mapWidth; x++) {
+            if (nationMap[y][x].nationId === nationId) {
+                dist[y][x] = Infinity;
+            }
+        }
+    }
+
+    // Pass 1: Top-left to bottom-right (calculates distance to nearest top or left border)
+    for (let y = 0; y < mapHeight; y++) {
+        for (let x = 0; x < mapWidth; x++) {
+            if (dist[y][x] !== 0) {
+                let minDist = Infinity;
+                if (y > 0) minDist = Math.min(minDist, dist[y - 1][x] + 1);
+                if (x > 0) minDist = Math.min(minDist, dist[y][x - 1] + 1);
+                if (y > 0 && x > 0) minDist = Math.min(minDist, dist[y-1][x-1] + 1.414); // Diagonal
+                dist[y][x] = Math.min(dist[y][x], minDist);
+            }
+        }
+    }
+
+    // Pass 2: Bottom-right to top-left (calculates distance to nearest bottom or right border)
+    let maxDist = 0;
+    for (let y = mapHeight - 1; y >= 0; y--) {
+        for (let x = mapWidth - 1; x >= 0; x--) {
+            if (dist[y][x] !== 0) {
+                let minDist = Infinity;
+                if (y < mapHeight - 1) minDist = Math.min(minDist, dist[y + 1][x] + 1);
+                if (x < mapWidth - 1) minDist = Math.min(minDist, dist[y][x + 1] + 1);
+                if (y < mapHeight - 1 && x < mapWidth - 1) minDist = Math.min(minDist, dist[y+1][x+1] + 1.414); // Diagonal
+                dist[y][x] = Math.min(dist[y][x], minDist);
+                if (dist[y][x] > maxDist) maxDist = dist[y][x];
+            }
+        }
+    }
+    
+    // Find the point with the best score, penalizing edges of the map
+    let bestScore = -1;
+    let bestPos = { x: -1, y: -1 };
+    
+    // The margin from the edge where the penalty starts to apply (e.g., 15% of the map width)
+    const margin = Math.min(mapWidth, mapHeight) * 0.15;
+
+    for (let y = 0; y < mapHeight; y++) {
+        for (let x = 0; x < mapWidth; x++) {
+            if (nationMap[y][x].nationId === nationId) {
+                // Distance from this point to the closest nation border
+                const internalDistance = dist[y][x];
+
+                // Calculate a weight based on distance from the map edges.
+                // Weight is 1.0 inside the margin, and drops to 0 at the edge.
+                const distToEdgeX = Math.min(x, mapWidth - 1 - x);
+                const distToEdgeY = Math.min(y, mapHeight - 1 - y);
+                
+                const weightX = Math.min(1.0, distToEdgeX / margin);
+                const weightY = Math.min(1.0, distToEdgeY / margin);
+                
+                // The final weight is the product of both axis weights.
+                // This creates a strong penalty for being near any edge.
+                const edgeWeight = weightX * weightY;
+
+                // The score is the distance from the nation border, multiplied by the edge penalty.
+                const score = internalDistance * edgeWeight;
+                
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestPos = { x, y };
+                }
+            }
+        }
+    }
+    
+    // Fallback in case no suitable point is found (e.g., for a 1-pixel nation)
+    if (bestPos.x === -1) {
+        for(let y = 0; y < mapHeight; y++) {
+            for(let x = 0; x < mapWidth; x++) {
+                if (nationMap[y][x].nationId === nationId) return {x, y};
+            }
+        }
+    }
+
+    return bestPos;
+}
+
+
 function generateOklchPalette(count) {
     const colors = [];
     const goldenRatioConjugate = 0.61803398875;
@@ -106,7 +195,10 @@ const TERRAIN_POPULATION_MODIFIERS = {
     [terrainType.MOUNTAIN_SNOW]: 0.0,
     [terrainType.RIVER]: 0,
     [terrainType.OCEAN]: 0,
-    [terrainType.SEA]: 0
+    [terrainType.SEA]: 0,
+    [terrainType.GRASS_HIGHLAND]: 0.9,
+    [terrainType.FOREST_HIGHLAND]: 0.4,
+    [terrainType.STONE_CLIFF]: 0.05
 };
 
 const TERRAIN_NAMES = {
@@ -121,12 +213,16 @@ const TERRAIN_NAMES = {
     [terrainType.SAND]: 'Coasts',
     [terrainType.DRY_SAND]: 'Coasts',
     [terrainType.WET_SAND]: 'Coasts',
+    [terrainType.GRASS_HIGHLAND]: 'Highlands',
+    [terrainType.FOREST_HIGHLAND]: 'Highland Forests',
+    [terrainType.STONE_CLIFF]: 'Cliffs'
 };
 
 const UNSUITABLE_TERRAIN_FOR_SETTLEMENTS = new Set([
     terrainType.MOUNTAIN_SNOW,
     terrainType.MOUNTAIN,
     terrainType.DRY_SAND,
+    terrainType.STONE_CLIFF
 ]);
 
 function randomElement(arr) {
@@ -291,7 +387,7 @@ export function generatePoliticalLayer(physmap, baseSeeds, mapWidth, mapHeight, 
         }
 
         const terrainCell = physmap[cy][cx];
-        if (terrainCell.type !== terrainType.OCEAN && terrainCell.type !== terrainType.SEA) {
+        if (terrainCell.type !== terrainType.OCEAN && terrainCell.type !== terrainType.SEA && terrainCell.type !== terrainType.SHALLOW_WATER) {
             let tooClose = false;
             if (capitals.length > 0 && numNations > 1) {
                 for (const cap of capitals) {
@@ -318,7 +414,7 @@ export function generatePoliticalLayer(physmap, baseSeeds, mapWidth, mapHeight, 
         const landCells = [];
         for (let r = 0; r < mapHeight; r++) {
             for (let c = 0; c < mapWidth; c++) {
-                if (physmap[r] && physmap[r][c] && physmap[r][c].type !== terrainType.OCEAN && physmap[r][c].type !== terrainType.SEA) {
+                if (physmap[r] && physmap[r][c] && physmap[r][c].type !== terrainType.OCEAN && physmap[r][c].type !== terrainType.SEA && physmap[r][c].type !== terrainType.SHALLOW_WATER) {
                     landCells.push({ x: c, y: r });
                 }
             }
@@ -375,7 +471,7 @@ export function generatePoliticalLayer(physmap, baseSeeds, mapWidth, mapHeight, 
             if (nx >= 0 && nx < mapWidth && ny >= 0 && ny < mapHeight) {
                 if (!physmap[ny] || !physmap[ny][nx]) continue;
                 const neighborTerrainCell = physmap[ny][nx];
-                if (neighborTerrainCell.type === terrainType.OCEAN || neighborTerrainCell.type === terrainType.SEA) continue;
+                if (neighborTerrainCell.type === terrainType.OCEAN || neighborTerrainCell.type === terrainType.SEA || neighborTerrainCell.type === terrainType.SHALLOW_WATER) continue;
                 let baseStepCost = 1.0;
                 if (neighborTerrainCell.type === terrainType.FOREST) baseStepCost = 1.8;
                 else if (neighborTerrainCell.type === terrainType.RIVER) baseStepCost = 1.4;
@@ -384,7 +480,8 @@ export function generatePoliticalLayer(physmap, baseSeeds, mapWidth, mapHeight, 
                 else if (neighborTerrainCell.type === terrainType.MOUNTAIN ||
                     neighborTerrainCell.type === terrainType.MOUNTAIN_ORE ||
                     neighborTerrainCell.type === terrainType.MOUNTAIN_SNOW ||
-                    neighborTerrainCell.type === 'HILLS') baseStepCost = 3.0;
+                    neighborTerrainCell.type === 'HILLS' ||
+                    neighborTerrainCell.type === terrainType.STONE_CLIFF) baseStepCost = 3.0;
                 const distortionVal = (expansionDistortionNoise(nx / DISTORTION_NOISE_SCALE, ny / DISTORTION_NOISE_SCALE) + 1) / 2;
                 const distortionFactor = 1.0 + (distortionVal - 0.5) * MAX_DISTORTION_EFFECT_STRENGTH;
                 const roughnessVal = borderRoughnessNoise(nx / BORDER_ROUGHNESS_NOISE_SCALE, ny / BORDER_ROUGHNESS_NOISE_SCALE);
@@ -461,7 +558,7 @@ export function generatePoliticalLayer(physmap, baseSeeds, mapWidth, mapHeight, 
     for (let y = 0; y < mapHeight; y++) {
         for (let x = 0; x < mapWidth; x++) {
             const physCell = physmap[y][x];
-            const isLand = physCell.type !== terrainType.OCEAN && physCell.type !== terrainType.SEA;
+            const isLand = physCell.type !== terrainType.OCEAN && physCell.type !== terrainType.SEA && physCell.type !== terrainType.SHALLOW_WATER;
             const nationId = nationMap[y][x].nationId;
 
             if (isLand && nationId !== null && !visited[y][x]) {
@@ -515,7 +612,7 @@ export function generatePoliticalLayer(physmap, baseSeeds, mapWidth, mapHeight, 
                 if (nx < 0 || nx >= mapWidth || ny < 0 || ny >= mapHeight) continue;
                 
                 const neighborPhys = physmap[ny][nx];
-                const neighborIsWater = neighborPhys.type === terrainType.OCEAN || neighborPhys.type === terrainType.SEA;
+                const neighborIsWater = neighborPhys.type === terrainType.OCEAN || neighborPhys.type === terrainType.SEA || neighborPhys.type === terrainType.SHALLOW_WATER;
                 
                 if (neighborIsWater) {
                     isIsland = true;
@@ -577,7 +674,7 @@ export function generatePoliticalLayer(physmap, baseSeeds, mapWidth, mapHeight, 
             const cellInfo = nationMap[y][x];
             const physCell = physmap[y][x];
             if (cellInfo && typeof cellInfo.nationId === 'number' &&
-                physCell.type !== terrainType.OCEAN && physCell.type !== terrainType.SEA) {
+                physCell.type !== terrainType.OCEAN && physCell.type !== terrainType.SEA && physCell.type !== terrainType.SHALLOW_WATER) {
                 const nationId = cellInfo.nationId;
                 const nation = nationDataMap[nationId];
                 if (!nation) continue;
@@ -603,6 +700,9 @@ export function generatePoliticalLayer(physmap, baseSeeds, mapWidth, mapHeight, 
         [terrainType.SAND]:           [{ resource: 'Fish', weight: 8 }, { resource: 'Salt', weight: 4 }],
         [terrainType.DRY_SAND]:       [{ resource: 'Salt', weight: 3 }],
         [terrainType.WET_SAND]:       [{ resource: 'Fish', weight: 10 }, { resource: 'Salt', weight: 2 }],
+        [terrainType.STONE_CLIFF]:    [{ resource: 'Stone', weight: 4 }],
+        [terrainType.GRASS_HIGHLAND]: [{ resource: 'Livestock', weight: 6 }],
+        [terrainType.FOREST_HIGHLAND]:[{ resource: 'Wood', weight: 8 }, { resource: 'Game', weight: 4 }],
     };
 
     const RESOURCE_DESCRIPTIONS = {
@@ -724,12 +824,8 @@ export function generatePoliticalLayer(physmap, baseSeeds, mapWidth, mapHeight, 
     const politicalMapOutput = Array.from({ length: mapHeight }, () =>
         Array.from({ length: mapWidth }, () => ({ nationId: null, borders: { top: false, bottom: false, left: false, right: false } }))
     );
-    const nationSumX = {},
-        nationSumY = {},
-        nationMinMaxCoords = {};
+    const nationMinMaxCoords = {};
     nationInfoList.forEach(n => {
-        nationSumX[n.id] = 0;
-        nationSumY[n.id] = 0;
         nationMinMaxCoords[n.id] = { minX: mapWidth, maxX: -1, minY: mapHeight, maxY: -1 };
     });
 
@@ -740,12 +836,10 @@ export function generatePoliticalLayer(physmap, baseSeeds, mapWidth, mapHeight, 
             politicalMapOutput[y][x].nationId = currentCellNationId;
 
             const physCell = physmap[y][x];
-            if (physCell.type === terrainType.OCEAN || physCell.type === terrainType.SEA || typeof currentCellNationId !== 'number') {
+            if (physCell.type === terrainType.OCEAN || physCell.type === terrainType.SEA || physCell.type === terrainType.SHALLOW_WATER || typeof currentCellNationId !== 'number') {
                 continue;
             }
             const nation = nationDataMap[currentCellNationId];
-            nationSumX[currentCellNationId] += x;
-            nationSumY[currentCellNationId] += y;
             nationMinMaxCoords[currentCellNationId].minX = Math.min(nationMinMaxCoords[currentCellNationId].minX, x);
             nationMinMaxCoords[currentCellNationId].maxX = Math.max(nationMinMaxCoords[currentCellNationId].maxX, x);
             nationMinMaxCoords[currentCellNationId].minY = Math.min(nationMinMaxCoords[currentCellNationId].minY, y);
@@ -755,7 +849,7 @@ export function generatePoliticalLayer(physmap, baseSeeds, mapWidth, mapHeight, 
                 const ny = y + dir.dy;
                 if (nx < 0 || nx >= mapWidth || ny < 0 || ny >= mapHeight) continue;
                 const neighborPhysCell = physmap[ny][nx];
-                if (neighborPhysCell.type === terrainType.OCEAN || neighborPhysCell.type === terrainType.SEA) continue;
+                if (neighborPhysCell.type === terrainType.OCEAN || neighborPhysCell.type === terrainType.SEA || neighborPhysCell.type === terrainType.SHALLOW_WATER) continue;
 
                 const neighborNationCell = nationMap[ny] && nationMap[ny][nx];
                 const neighborNationId = (neighborNationCell && neighborNationCell.nationId !== null) ? neighborNationCell.nationId : null;
@@ -775,15 +869,12 @@ export function generatePoliticalLayer(physmap, baseSeeds, mapWidth, mapHeight, 
     nationInfoList.forEach(nation => {
         nation.neighbors = [...nation.neighbors];
         if (nation.cellCount > 0) {
-            const avgX = nationSumX[nation.id] / nation.cellCount;
-            const avgY = nationSumY[nation.id] / nation.cellCount;
-            let lx = Math.floor(avgX);
-            let ly = Math.floor(avgY);
-            if (!(nationMap[ly] && nationMap[ly][lx] && nationMap[ly][lx].nationId === nation.id && physmap[ly] && physmap[ly][lx] && physmap[ly][lx].type !== terrainType.OCEAN && physmap[ly][lx].type !== terrainType.SEA)) {
-                lx = nation.capital.x;
-                ly = nation.capital.y;
+            const bestPos = findBestLabelPosition(nation.id, nationMap, mapWidth, mapHeight);
+            if (bestPos.x !== -1) {
+                nation.labelPosition = bestPos;
+            } else {
+                nation.labelPosition = { x: nation.capital.x, y: nation.capital.y };
             }
-            nation.labelPosition = { x: lx, y: ly };
         } else {
             nation.labelPosition = { x: nation.capital.x, y: nation.capital.y };
         }

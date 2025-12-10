@@ -16,7 +16,7 @@ function hideInfoPopup() {
     currentlyOpenNationId = null;
 }
 
-function showInfoPopup(nation) {
+function showInfoPopup(nation, event) {
     if (!nation || !nationInfoPopup) return;
 
     nationNameEl.textContent = `${nation.name} (${nation.formOfGovernment})`;
@@ -45,8 +45,32 @@ function showInfoPopup(nation) {
 
     nationInfoPopup.style.display = 'block';
     
-    nationInfoPopup.style.left = '15px';
-    nationInfoPopup.style.top = '15px';
+    const popupWidth = nationInfoPopup.offsetWidth;
+    const popupHeight = nationInfoPopup.offsetHeight;
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const margin = 15;
+
+    let left = event.clientX + margin;
+    let top = event.clientY + margin;
+
+    if (left + popupWidth + margin > viewportWidth) {
+        left = event.clientX - popupWidth - margin;
+    }
+
+    if (top + popupHeight + margin > viewportHeight) {
+        top = event.clientY - popupHeight - margin;
+    }
+
+    if (top < margin) {
+        top = margin;
+    }
+    if (left < margin) {
+        left = margin;
+    }
+
+    nationInfoPopup.style.left = `${left}px`;
+    nationInfoPopup.style.top = `${top}px`;
     
     currentlyOpenNationId = nation.id;
 }

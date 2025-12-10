@@ -13,6 +13,7 @@ import { initializeInfoPopup, showInfoPopup, hideInfoPopup, isPopupOpenForNation
 let isPoliticalMapVisible = false;
 let isSettlementsLayerVisible = false;
 let isPoiLayerVisible = false;
+let is3dViewEnabled = true;
 let currentPalette = 'default';
 let nationLookup = null;
 
@@ -59,7 +60,7 @@ function fullStateUpdate() {
         height: physmap ? physmap.length : 0,
         cellSize: getCellSize()
     });
-    ui.updateLayerButtonsState(isPoliticalMapVisible, isSettlementsLayerVisible, isPoiLayerVisible, !!politicalMap, !!physmap);
+    ui.updateLayerButtonsState(isPoliticalMapVisible, isSettlementsLayerVisible, isPoiLayerVisible, is3dViewEnabled, !!politicalMap, !!physmap);
     ui.updateGenerationScaleDisplay(getGenerationScale());
 }
 
@@ -135,9 +136,9 @@ const callbacks = {
             cellSize: downloadCellPixelSize,
             drawBaseTerrain: true,
             drawRivers: true,
+            draw3dEdges: is3dViewEnabled,
             drawPoliticalLayer: isPoliticalMapVisible,
             drawRoads: isSettlementsLayerVisible,
-            drawSettlements: isSettlementsLayerVisible,
             drawNationNames: isPoliticalMapVisible
         });
 
@@ -205,6 +206,11 @@ const callbacks = {
             fullStateUpdate();
         }
     },
+    onToggle3dView: () => {
+        is3dViewEnabled = !is3dViewEnabled;
+        renderer.markAllCachesDirty();
+        fullStateUpdate();
+    },
     onPaletteChange: handlePaletteChange,
     onSliderChange: (settings, isPhysmapChange) => {
         updateGenerationSettings(settings);
@@ -229,7 +235,7 @@ const callbacks = {
         
         const clickedNationId = politicalData.mapGrid[gridY]?.[gridX]?.nationId;
         if (typeof clickedNationId === 'number' && !isPopupOpenForNation(clickedNationId)) {
-            showInfoPopup(nationLookup.get(clickedNationId));
+            showInfoPopup(nationLookup.get(clickedNationId), event);
         }
     }
 };
@@ -245,7 +251,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const seedFromURL = getSeedFromURL();
     regenerateMapAndView(seedFromURL); 
 
-    renderer.startRenderLoop(() => ({ isPoliticalMapVisible, isSettlementsLayerVisible, isPoiLayerVisible }));
+    renderer.startRenderLoop(() => ({ isPoliticalMapVisible, isSettlementsLayerVisible, isPoiLayerVisible, is3dViewEnabled }));
 
     window.addEventListener('resize', () => {
         camera.onResize();

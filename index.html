@@ -270,7 +270,6 @@
             </div>
             
             <div class="menu-content-area">
-                <!-- Панель 1: Generation -->
                 <div class="menu-content-panel active" data-content-id="generation">
                     <div class="control-group">
                         <button id="zoom-out" title="Decrease map detail">-</button>
@@ -330,14 +329,12 @@
                     </div>
                 </div>
 
-                <!-- Панель 2: Layers -->
                 <div class="menu-content-panel" data-content-id="layers">
                      <div class="control-group">
                         <button id="toggle-political-layer">Politics</button>
                         <button id="toggle-settlements-layer">Settlements</button>
                         <button id="toggle-poi-layer">POI</button>
                     </div>
-                    <!-- START OF CHANGE: Added palette switcher -->
                     <div class="control-group">
                         <hr>
                     </div>
@@ -345,10 +342,11 @@
                         <button class="palette-button active-palette" data-palette="default">Default Palette</button>
                         <button class="palette-button" data-palette="oklch">Vibrant Palette</button>
                     </div>
-                    <!-- END OF CHANGE -->
+                    <div class="control-group">
+                        <button id="toggle-3d-view">Disable 3D View</button>
+                    </div>
                 </div>
 
-                <!-- Панель 3: Save -->
                 <div class="menu-content-panel" data-content-id="save">
                     <div class="control-group">
                         <input type="text" id="seed-input" placeholder="Paste map seed here">

@@ -1,6 +1,96 @@
 import { createNoise, newFractalNoise, defaultOctaves, defaultFrequency, defaultPersistence, generateRandomSeed } from './mapgen.js';
 import { generatePoliticalLayer } from './political-map-gen.js';
-import { terrainType } from './terrain-types.js'; 
+import { terrainType } from './terrain-types.js';
+
+/**
+ * Новая 
+ * @param {object[][]} map - Карта для обработки.
+ * @param {number} width - Ширина карты.
+ * @param {number} height - Высота карты.
+ * @param {number} minSize - Минимальный размер группы биома для сохранения.
+ */
+function filterSmallBiomes(map, width, height, minSize = 3) {
+    const visited = Array.from({ length: height }, () => new Array(width).fill(false));
+    const unfilterableTypes = new Set([
+        terrainType.OCEAN,
+        terrainType.SEA,
+        terrainType.SHALLOW_WATER,
+        terrainType.RIVER,
+        terrainType.WET_SAND,
+        terrainType.SAND,
+        terrainType.DRY_SAND
+    ]);
+
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            if (visited[y][x]) {
+                continue;
+            }
+
+            const currentType = map[y][x].type;
+            if (unfilterableTypes.has(currentType)) {
+                visited[y][x] = true;
+                continue;
+            }
+
+            const componentCells = [];
+            const queue = [{ x, y }];
+            visited[y][x] = true;
+            let head = 0;
+
+            while (head < queue.length) {
+                const pos = queue[head++];
+                componentCells.push(pos);
+
+                for (let dy = -1; dy <= 1; dy++) {
+                    for (let dx = -1; dx <= 1; dx++) {
+                        if (dx === 0 && dy === 0) continue;
+                        const nx = pos.x + dx;
+                        const ny = pos.y + dy;
+
+                        if (nx >= 0 && nx < width && ny >= 0 && ny < height && !visited[ny][nx] && map[ny][nx].type === currentType) {
+                            visited[ny][nx] = true;
+                            queue.push({ x: nx, y: ny });
+                        }
+                    }
+                }
+            }
+
+            if (componentCells.length < minSize) {
+                const neighborCounts = {};
+                componentCells.forEach(cell => {
+                    for (let dy = -1; dy <= 1; dy++) {
+                        for (let dx = -1; dx <= 1; dx++) {
+                            if (dx === 0 && dy === 0) continue;
+                            const nx = cell.x + dx;
+                            const ny = cell.y + dy;
+                            if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                                const neighborType = map[ny][nx].type;
+                                if (neighborType !== currentType) {
+                                    neighborCounts[neighborType] = (neighborCounts[neighborType] || 0) + 1;
+                                }
+                            }
+                        }
+                    }
+                });
+
+                let dominantNeighborType = terrainType.GRASS; // Тип по умолчанию
+                let maxCount = 0;
+                for (const type in neighborCounts) {
+                    if (neighborCounts[type] > maxCount) {
+                        maxCount = neighborCounts[type];
+                        dominantNeighborType = type;
+                    }
+                }
+                
+                componentCells.forEach(cell => {
+                    map[cell.y][cell.x].type = dominantNeighborType;
+                });
+            }
+        }
+    }
+}
+
 
 function createSeededRandom(seed) {
     let state = seed % 2147483647;
@@ -32,41 +122,99 @@ export const MIN_GENERATION_SCALE = 0.5;
 export const MAX_GENERATION_SCALE = 5;
 export const GENERATION_SCALE_STEP = 0.5;
 
+const TERRAIN_HEIGHT_MAP = {
+    [terrainType.OCEAN]: 0,
+    [terrainType.SEA]: 1,
+    [terrainType.SHALLOW_WATER]: 2,
+    [terrainType.RIVER]: 2,
+    [terrainType.WET_SAND]: 3,
+    [terrainType.SAND]: 3,
+    [terrainType.DRY_SAND]: 3,
+    [terrainType.WET_GRASS]: 4,
+    [terrainType.GRASS]: 4,
+    [terrainType.DRY_GRASS]: 4,
+    [terrainType.FOREST]: 5,
+    [terrainType.GRASS_HIGHLAND]: 6,
+    [terrainType.FOREST_HIGHLAND]: 7,
+    [terrainType.STONE_CLIFF]: 5,
+    'HILLS': 6,
+    [terrainType.MOUNTAIN]: 8,
+    [terrainType.MOUNTAIN_ORE]: 9,
+    [terrainType.MOUNTAIN_SNOW]: 10,
+};
+
 function getColorForCellDefault(cell) {
+    const noise = cell.variantNoise;
     switch(cell.type) {
-        case terrainType.OCEAN: return '#003eb2';
-        case terrainType.SEA: return '#0952c6';
+        case terrainType.OCEAN: return '#183a8a';
+        case terrainType.SEA: return '#204daf';
+        case terrainType.SHALLOW_WATER: return '#2d71d3';
         case terrainType.RIVER: return '#2581c2';
-        case terrainType.WET_SAND: return '#867645';
-        case terrainType.SAND: return '#a49463';
-        case terrainType.DRY_SAND: return '#c2b281';
-        case terrainType.MOUNTAIN_SNOW: return '#ebebeb';
+        
+        case terrainType.SAND:
+        case terrainType.WET_SAND:
+        case terrainType.DRY_SAND:
+            return noise > 0.1 ? '#d1c9a0' : '#c2b88f';
+        
+        case terrainType.MOUNTAIN_SNOW: return '#f5f5f5';
         case terrainType.MOUNTAIN_ORE: return '#8c8e7b';
         case terrainType.MOUNTAIN: return '#a0a28f';
-        case terrainType.DRY_GRASS: return '#284d00';
-        case terrainType.GRASS: return '#3c6114';
-        case terrainType.WET_GRASS: return '#5a7f32';
-        case terrainType.FOREST: return '#203f00';
+
+        case terrainType.GRASS:
+        case terrainType.WET_GRASS:
+        case terrainType.DRY_GRASS:
+             return noise > 0.05 ? '#5e8c31' : '#567e2c';
+        
+        case terrainType.FOREST:
+            return noise > 0.02 ? '#3b5a1f' : '#35501b';
+
+        case terrainType.GRASS_HIGHLAND:
+            return noise > 0.05 ? '#6a9b3a' : '#618c35';
+
+        case terrainType.FOREST_HIGHLAND:
+            return noise > 0.02 ? '#456926' : '#3e5e21';
+
+        case terrainType.STONE_CLIFF:
+            return noise > 0.1 ? '#828282' : '#7a7a7a';
+
         default: return '#000000';
     }
 }
 
 function getColorForCellOklch(cell) {
-    const variantValue = cell.variantNoise || 0;
-    switch(cell.type) {
-        case terrainType.OCEAN: return `oklch(${25 + variantValue * 2}% 0.1 230)`;
-        case terrainType.SEA: return `oklch(${40 + variantValue * 4}% 0.12 220)`;
+    const noise = cell.variantNoise;
+     switch(cell.type) {
+        case terrainType.OCEAN: return `oklch(35% 0.1 240)`;
+        case terrainType.SEA: return `oklch(45% 0.12 235)`;
+        case terrainType.SHALLOW_WATER: return `oklch(60% 0.14 230)`;
         case terrainType.RIVER: return 'oklch(55% 0.15 215)';
-        case terrainType.WET_SAND: return `oklch(75% 0.08 90)`;
-        case terrainType.SAND: return `oklch(${85 + variantValue * 8}% 0.09 90)`;
-        case terrainType.DRY_SAND: return `oklch(92% 0.07 90)`;
+        
+        case terrainType.SAND:
+        case terrainType.WET_SAND:
+        case terrainType.DRY_SAND:
+            return noise > 0.1 ? `oklch(85% 0.06 95)` : `oklch(82% 0.07 95)`;
+        
         case terrainType.MOUNTAIN_SNOW: return `oklch(98% 0.005 100)`;
-        case terrainType.MOUNTAIN_ORE: return `oklch(${60 + variantValue * 5}% 0.05 70)`;
-        case terrainType.MOUNTAIN: return `oklch(${65 + variantValue * 5}% 0.03 100)`;
-        case terrainType.DRY_GRASS: return `oklch(${70 + variantValue * 4}% 0.12 110)`;
-        case terrainType.GRASS: return `oklch(${65 + variantValue * 4}% 0.15 130)`;
-        case terrainType.WET_GRASS: return `oklch(${60 + variantValue * 4}% 0.14 140)`;
-        case terrainType.FOREST: return `oklch(${45 + variantValue * 3}% 0.16 135)`;
+        case terrainType.MOUNTAIN_ORE: return `oklch(60% 0.03 80)`;
+        case terrainType.MOUNTAIN: return `oklch(68% 0.02 90)`;
+
+        case terrainType.GRASS:
+        case terrainType.WET_GRASS:
+        case terrainType.DRY_GRASS:
+             return noise > 0.05 ? `oklch(62% 0.11 130)` : `oklch(59% 0.12 130)`;
+        
+        case terrainType.FOREST:
+            return noise > 0.05 ? `oklch(45% 0.1 135)` : `oklch(42% 0.11 135)`;
+
+        case terrainType.GRASS_HIGHLAND:
+            return noise > 0.05 ? `oklch(68% 0.12 125)` : `oklch(65% 0.13 125)`;
+
+        case terrainType.FOREST_HIGHLAND:
+            return noise > 0.05 ? `oklch(52% 0.11 135)` : `oklch(49% 0.12 135)`;
+
+        case terrainType.STONE_CLIFF:
+            return noise > 0.1 ? `oklch(58% 0.01 90)` : `oklch(55% 0.01 90)`;
+
         default: return '#000000';
     }
 }
@@ -120,7 +268,7 @@ function initializeNoiseGenerators(providedSeeds = null) {
   const sandNoise = newFractalNoise({ noise: createNoise(seeds.sand), octaves: 10, frequency: 0.1, persistence: 0.01 });
   return {
     terrainNoise: newFractalNoise({ noise: createNoise(seeds.terrain), octaves: defaultOctaves, frequency: defaultFrequency, persistence: defaultPersistence }),
-    variantNoise: newFractalNoise({ noise: createNoise(seeds.variant), octaves: defaultOctaves, frequency: defaultFrequency, persistence: defaultPersistence }),
+    variantNoise: newFractalNoise({ noise: createNoise(seeds.variant), octaves: 8, frequency: 1.2, persistence: 0.8 }),
     detailNoise: newFractalNoise({ noise: createNoise(seeds.detail), octaves: 6, frequency: 0.6, persistence: 0.7 }),
     mountainNoise1: newFractalNoise({ noise: createNoise(seeds.mountain1), octaves: defaultOctaves, frequency: defaultFrequency, persistence: defaultPersistence }),
     mountainNoise2: newFractalNoise({ noise: createNoise(seeds.mountain2), octaves: defaultOctaves, frequency: defaultFrequency, persistence: defaultPersistence }),
@@ -131,12 +279,16 @@ function initializeNoiseGenerators(providedSeeds = null) {
   };
 }
 
+function applyHillShading(map, width, height) {
+    // Эта функция больше не используется для основного рендеринга
+}
+
 function labelContinents(physmap, width, height) {
     let continentId = 0;
     for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
             const cell = physmap[y][x];
-            const isLand = cell.type !== terrainType.OCEAN && cell.type !== terrainType.SEA;
+            const isLand = cell.type !== terrainType.OCEAN && cell.type !== terrainType.SEA && cell.type !== terrainType.SHALLOW_WATER;
             if (isLand && cell.continentId === undefined) {
                 continentId++;
                 const queue = [{ x, y }];
@@ -152,7 +304,7 @@ function labelContinents(physmap, width, height) {
                             const ny = pos.y + dy;
                             if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
                                 const neighborCell = physmap[ny][nx];
-                                const isNeighborLand = neighborCell.type !== terrainType.OCEAN && neighborCell.type !== terrainType.SEA;
+                                const isNeighborLand = neighborCell.type !== terrainType.OCEAN && neighborCell.type !== terrainType.SEA && neighborCell.type !== terrainType.SHALLOW_WATER;
                                 if (isNeighborLand && neighborCell.continentId === undefined) {
                                     neighborCell.continentId = continentId;
                                     queue.push({ x: nx, y: ny });
@@ -172,7 +324,7 @@ function labelWaterBodies(physmap, width, height) {
     for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
             const cell = physmap[y][x];
-            const isWater = cell.type === terrainType.OCEAN || cell.type === terrainType.SEA;
+            const isWater = cell.type === terrainType.OCEAN || cell.type === terrainType.SEA || cell.type === terrainType.SHALLOW_WATER;
             if (isWater && cell.waterBodyId === undefined) {
                 waterBodyId++;
                 const queue = [{ x, y }];
@@ -189,7 +341,7 @@ function labelWaterBodies(physmap, width, height) {
                             const ny = pos.y + dy;
                             if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
                                 const neighborCell = physmap[ny][nx];
-                                const isNeighborWater = neighborCell.type !== terrainType.OCEAN || neighborCell.type !== terrainType.SEA;
+                                const isNeighborWater = neighborCell.type !== terrainType.OCEAN || neighborCell.type !== terrainType.SEA || neighborCell.type !== terrainType.SHALLOW_WATER;
                                 if (isNeighborWater && neighborCell.waterBodyId === undefined) {
                                     neighborCell.waterBodyId = waterBodyId;
                                     currentSize++;
@@ -255,124 +407,255 @@ function bresenhamLine(p1, p2) {
     return points;
 }
 
+// ==========================================
+// ИСПРАВЛЕННЫЙ map-data.js
+// Вставь это вместо предыдущей версии generateRivers и класса Heap
+// ==========================================
+
+// Оптимизированная куча на TypedArrays для экономии памяти
+// ==========================================
+// ВСТАВИТЬ В map-data.js
+// ==========================================
+
+// Класс кучи (без изменений, он хороший)
+class ErosionMinHeap {
+    constructor(maxSize) {
+        this.data = new Int32Array(maxSize);
+        this.priorities = new Float32Array(maxSize);
+        this.length = 0;
+    }
+    push(item, priority) {
+        if (this.length >= this.data.length) return;
+        this.data[this.length] = item;
+        this.priorities[this.length] = priority;
+        this._bubbleUp(this.length);
+        this.length++;
+    }
+    pop() {
+        if (this.length === 0) return null;
+        const result = this.data[0];
+        this.length--;
+        if (this.length > 0) {
+            this.data[0] = this.data[this.length];
+            this.priorities[0] = this.priorities[this.length];
+            this._bubbleDown(0);
+        }
+        return result;
+    }
+    size() { return this.length; }
+    _bubbleUp(index) {
+        while (index > 0) {
+            const parentIndex = (index - 1) >>> 1;
+            if (this.priorities[index] >= this.priorities[parentIndex]) break;
+            this._swap(index, parentIndex);
+            index = parentIndex;
+        }
+    }
+    _bubbleDown(index) {
+        while (true) {
+            const left = (index << 1) + 1;
+            const right = left + 1;
+            let smallest = index;
+            if (left < this.length && this.priorities[left] < this.priorities[smallest]) smallest = left;
+            if (right < this.length && this.priorities[right] < this.priorities[smallest]) smallest = right;
+            if (smallest === index) break;
+            this._swap(index, smallest);
+            index = smallest;
+        }
+    }
+    _swap(i, j) {
+        const tempD = this.data[i]; this.data[i] = this.data[j]; this.data[j] = tempD;
+        const tempP = this.priorities[i]; this.priorities[i] = this.priorities[j]; this.priorities[j] = tempP;
+    }
+}
+
 function generateRivers(physmap, width, height, noise) {
-    const random = createSeededRandom(currentMapSeeds.river);
+    console.time("Hydraulic Erosion Anti-Diagonal");
+    riverNetwork = [];
 
-    labelContinents(physmap, width, height);
-    const waterBodySizes = labelWaterBodies(physmap, width, height);
+    const totalPixels = width * height;
+    const heightMap = new Float32Array(totalPixels);
+    const oceanMap = new Uint8Array(totalPixels);
 
-    const MIN_WATER_BODY_SIZE_FOR_RIVER = (width * height) * 0.01;
-
-    const mountainsByContinent = {};
-    const coastsByContinent = {};
-
+    // 1. Инициализация
     for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
+            const idx = y * width + x;
             const cell = physmap[y][x];
-            if (cell.continentId === undefined) continue;
-
-            if (cell.type === terrainType.MOUNTAIN || cell.type === terrainType.MOUNTAIN_ORE || cell.type === 'FOREST' || cell.type === terrainType.GRASS || cell.type === terrainType.WET_GRASS || cell.type === terrainType.DRY_GRASS) {
-                if (!mountainsByContinent[cell.continentId]) mountainsByContinent[cell.continentId] = [];
-                mountainsByContinent[cell.continentId].push({ x, y });
-            }
             
-            let isCoastal = false;
-            for (let dy = -1; dy <= 1; dy++) {
-                for (let dx = -1; dx <= 1; dx++) {
-                     if (dx === 0 && dy === 0) continue;
-                     const nx = x + dx, ny = y + dy;
-                     if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
-                        const nCell = physmap[ny][nx];
-                        const isWater = nCell.type === terrainType.OCEAN || nCell.type === terrainType.SEA;
-                        if (isWater) {
-                           const waterId = nCell.waterBodyId;
-                           if (waterId !== undefined && waterBodySizes.get(waterId) >= MIN_WATER_BODY_SIZE_FOR_RIVER) {
-                               isCoastal = true;
-                               break; 
-                           }
-                        }
-                     }
-                }
-                if (isCoastal) break;
-            }
-
-            if (isCoastal) {
-                if (!coastsByContinent[cell.continentId]) coastsByContinent[cell.continentId] = [];
-                coastsByContinent[cell.continentId].push({ x, y });
+            if (cell.type === terrainType.OCEAN || 
+                cell.type === terrainType.SEA || 
+                cell.type === terrainType.SHALLOW_WATER) {
+                
+                heightMap[idx] = -1000.0; 
+                oceanMap[idx] = 1;        
+            } else {
+                heightMap[idx] = cell.heightValue;
             }
         }
     }
-    
-    for (const continentId in mountainsByContinent) {
-        const mountains = mountainsByContinent[continentId];
-        const coasts = coastsByContinent[continentId];
-        const riverMouths = [];
-        const MIN_RIVER_MOUTH_DISTANCE = Math.max(15, (width + height) / 2 * 0.05);
-        const MIN_RIVER_MOUTH_DISTANCE_SQ = MIN_RIVER_MOUTH_DISTANCE * MIN_RIVER_MOUTH_DISTANCE;
 
-        if (!coasts || coasts.length === 0) continue;
+    // 2. Fill Sinks (Заполнение ям)
+    const heap = new ErosionMinHeap(totalPixels);
+    const visited = new Uint8Array(totalPixels);
 
-        for (let i = mountains.length - 1; i > 0; i--) {
-            const j = Math.floor(random() * (i + 1));
-            [mountains[i], mountains[j]] = [mountains[j], mountains[i]];
+    for (let i = 0; i < totalPixels; i++) {
+        const x = i % width;
+        const y = (i / width) | 0;
+        if (oceanMap[i] === 1 || x === 0 || x === width - 1 || y === 0 || y === height - 1) {
+            visited[i] = 1;
+            heap.push(i, heightMap[i]);
         }
+    }
+
+    const dxs = [-1, 0, 1, -1, 1, -1, 0, 1];
+    const dys = [-1, -1, -1, 0, 0, 1, 1, 1];
+
+    while (heap.size() > 0) {
+        const idx = heap.pop();
+        const h = heightMap[idx];
+        const cx = idx % width;
+        const cy = (idx / width) | 0;
+
+        for (let i = 0; i < 8; i++) {
+            const nx = cx + dxs[i];
+            const ny = cy + dys[i];
+            if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                const nIdx = ny * width + nx;
+                if (visited[nIdx] === 0) {
+                    visited[nIdx] = 1;
+                    let newHeight = heightMap[nIdx];
+                    if (newHeight < h) {
+                        newHeight = h + 0.00001; 
+                    }
+                    heightMap[nIdx] = newHeight;
+                    heap.push(nIdx, newHeight);
+                }
+            }
+        }
+    }
+
+    // 3. Расчет направления потока (ИСПРАВЛЕНИЕ ДИАГОНАЛЕЙ)
+    const flowTarget = new Int32Array(totalPixels).fill(-1);
+    const sortedIndices = new Int32Array(totalPixels);
+    for(let i=0; i<totalPixels; i++) sortedIndices[i] = i;
+    sortedIndices.sort((a, b) => heightMap[b] - heightMap[a]);
+
+    const SQRT2 = 1.41421356;
+
+    for (let i = 0; i < totalPixels; i++) {
+        const idx = sortedIndices[i];
+        if (oceanMap[idx]) continue;
+
+        const cx = idx % width;
+        const cy = (idx / width) | 0;
+
+        let lowestIdx = -1;
+        let maxSlope = -Infinity; // Ищем самый крутой УКЛОН, а не перепад
+
+        for (let j = 0; j < 8; j++) {
+            const nx = cx + dxs[j];
+            const ny = cy + dys[j];
+            
+            if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                const nIdx = ny * width + nx;
+                const drop = heightMap[idx] - heightMap[nIdx];
+                
+                if (drop > 0) {
+                    // КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ:
+                    // Делим перепад на расстояние.
+                    // Если сосед по диагонали - расстояние 1.41, иначе 1.0.
+                    // Это убирает преимущество диагоналей.
+                    const isDiagonal = (dxs[j] !== 0 && dys[j] !== 0);
+                    const dist = isDiagonal ? SQRT2 : 1.0;
+                    const slope = drop / dist;
+
+                    if (slope > maxSlope) {
+                        maxSlope = slope;
+                        lowestIdx = nIdx;
+                    }
+                }
+            }
+        }
+        if (lowestIdx !== -1) {
+            flowTarget[idx] = lowestIdx;
+        }
+    }
+
+    // 4. Накопление потока
+    const flux = new Float32Array(totalPixels).fill(1.0);
+    for (let i = 0; i < totalPixels; i++) {
+        const idx = sortedIndices[i];
+        const target = flowTarget[idx];
+        if (target !== -1) {
+            flux[target] += flux[idx];
+        }
+    }
+
+    // 5. Создание рек с визуальным смещением (Jitter)
+    const RIVER_THRESHOLD = totalPixels * 0.0035; 
+    const processed = new Uint8Array(totalPixels);
+    let riverSegmentsCount = 0;
+
+    // Функция для получения стабильного случайного смещения для координат
+    // Чтобы реки не шли строго по центрам клеток
+    const getJitter = (vx, vy) => {
+        // Простой псевдо-рандом хеш
+        const val = Math.sin(vx * 12.9898 + vy * 78.233) * 43758.5453;
+        return (val - Math.floor(val) - 0.5) * 0.7; // Смещение от -0.35 до +0.35 клетки
+    };
+
+    for (let i = 0; i < totalPixels; i++) {
+        const startIdx = sortedIndices[i];
         
-        const numRivers = Math.min(mountains.length, Math.floor(mountains.length / 13000) + 1);
+        if (flux[startIdx] > RIVER_THRESHOLD && processed[startIdx] === 0 && !oceanMap[startIdx]) {
+            const path = [];
+            let curr = startIdx;
+            let safety = 0;
 
-        for (let i = 0; i < numRivers; i++) {
-            const start = mountains[i];
-            
-            if (coasts.length > 0) {
-                const coastsWithDist = coasts.map(c => {
-                    const dx = start.x - c.x;
-                    const dy = start.y - c.y;
-                    return { x: c.x, y: c.y, distSq: dx * dx + dy * dy };
-                });
-                coastsWithDist.sort((a, b) => a.distSq - b.distSq);
+            while (curr !== -1 && !oceanMap[curr] && safety < 10000) {
+                processed[curr] = 1;
+                const x = curr % width;
+                const y = (curr / width) | 0;
                 
-                const NUM_CANDIDATES_TO_CHECK = 30;
-                const candidatePool = coastsWithDist.slice(0, Math.min(NUM_CANDIDATES_TO_CHECK, coastsWithDist.length));
+                // ДОБАВЛЯЕМ ДЖИТТЕР К КООРДИНАТАМ ОТРИСОВКИ
+                // Сама логика (тайлы) остается целочисленной, но линия рисуется криво
+                const jx = x + getJitter(x, y);
+                const jy = y + getJitter(y, x); // Перестановка для y, чтобы отличалось
+
+                path.push({ x: jx, y: jy, flux: flux[curr] });
                 
-                const validEndPoints = candidatePool.filter(potentialEnd => {
-                    for (const mouth of riverMouths) {
-                        const dx = potentialEnd.x - mouth.x;
-                        const dy = potentialEnd.y - mouth.y;
-                        if ((dx * dx + dy * dy) < MIN_RIVER_MOUTH_DISTANCE_SQ) {
-                            return false;
-                        }
-                    }
-                    return true;
-                });
-
-                if (validEndPoints.length > 0) {
-                    const end = validEndPoints[Math.floor(random() * validEndPoints.length)];
-                    riverMouths.push(end);
-                    
-                    const points = [start];
-                    generateWarpedLine(start, end, noise, 10, points);
-                    
-                    const completeRiverPath = [];
-                    for (let j = 0; j < points.length - 1; j++) {
-                        const segment = bresenhamLine(points[j], points[j+1]);
-                        if (j > 0) segment.shift();
-                        completeRiverPath.push(...segment);
-                    }
-                    if (completeRiverPath.length > 0) {
-                        riverNetwork.push(completeRiverPath);
-                    }
-                }
-            }
-        }
-    }
-
-    for (const path of riverNetwork) {
-        for (const point of path) {
-            const cell = physmap[point.y]?.[point.x];
-            if (cell && cell.type !== terrainType.OCEAN && cell.type !== terrainType.SEA) {
+                const cell = physmap[y][x];
                 cell.type = terrainType.RIVER;
+                cell.heightValue = Math.min(cell.heightValue, heightMap[curr] - 0.05);
+
+                const next = flowTarget[curr];
+                
+                // Слияние
+                if (next !== -1 && processed[next] === 1 && flux[next] > RIVER_THRESHOLD) {
+                    const nx = next % width;
+                    const ny = (next / width) | 0;
+                    // Тоже джиттерим точку слияния, чтобы линии сошлись
+                    const njx = nx + getJitter(nx, ny);
+                    const njy = ny + getJitter(ny, nx);
+                    
+                    path.push({ x: njx, y: njy, flux: flux[next] });
+                    break; 
+                }
+                
+                curr = next;
+                safety++;
+            }
+            
+            if (path.length > 1) {
+                riverNetwork.push(path);
+                riverSegmentsCount++;
             }
         }
     }
+
+    console.log(`Created ${riverSegmentsCount} river segments.`);
+    console.timeEnd("Hydraulic Erosion Anti-Diagonal");
 }
 
 export function generateNewPhysmapData(seeds = null, palette = 'default') {
@@ -416,12 +699,11 @@ export function generateNewPhysmapData(seeds = null, palette = 'default') {
           }
       }
 
-      const variantValue = noise.variantNoise(x/100, y/100);
+      const variantValue = noise.variantNoise(x/50, y/50);
       const sandValue = noise.sandNoise(x/50, y/50);
       
       const localSandThreshold = generationSettings.waterLevel + 0.02 + sandValue * 0.01;
       
-   
       const uplift = (noise.mountainNoise1(x / 350, y / 350) + 1) / 2;
       const mountainCore = Math.pow(uplift, 3.0);
 
@@ -433,14 +715,14 @@ export function generateNewPhysmapData(seeds = null, palette = 'default') {
 
       const finalMountainValue = ridgeStructure * mountainCore;
       
-
       const threshold = 0.2 + (generationSettings.mountainThreshold - 0.4) * 1.0;
       const isMountain = finalMountainValue > threshold;
 
-      let info = { terrainValue, variantNoise: variantValue };
+      let info = { variantNoise: variantValue, heightValue: terrainValue };
       
       if (terrainValue < generationSettings.waterLevel - 0.15) { info.type = terrainType.OCEAN; }
-      else if (terrainValue < generationSettings.waterLevel) { info.type = terrainType.SEA; }
+      else if (terrainValue < generationSettings.waterLevel - 0.05) { info.type = terrainType.SEA; }
+      else if (terrainValue < generationSettings.waterLevel) { info.type = terrainType.SHALLOW_WATER; }
       else if (terrainValue < localSandThreshold) {
         if (variantValue < -0.2) { info.type = terrainType.WET_SAND; }
         else if (variantValue < 0.2) { info.type = terrainType.SAND; }
@@ -453,19 +735,57 @@ export function generateNewPhysmapData(seeds = null, palette = 'default') {
         if (variantValue < -0.2) { info.type = terrainType.DRY_GRASS; }
         else if (variantValue < 0.2) { info.type = terrainType.GRASS; }
         else { info.type = terrainType.WET_GRASS; }
-      } else { info.type = 'FOREST'; }
+      } else { info.type = terrainType.FOREST; }
       
       newMap[y][x] = info;
     }
   }
-  
-  generateRivers(newMap, width, height, noise);
-  
-  physmap = newMap;
-  
-  recalculatePhysmapColors(palette);
 
-  politicalMap = null; 
+    // Фильтруем маленькие, изолированные группы биомов, чтобы уменьшить шум
+    filterSmallBiomes(newMap, width, height, 5);
+  
+    const TERRACE_STEP = 0.08;
+    const CLIFF_THRESHOLD = 0.12;
+
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            const cell = newMap[y][x];
+
+            const isWorkableTerrain = cell.type === terrainType.GRASS || 
+                                      cell.type === terrainType.WET_GRASS ||
+                                      cell.type === terrainType.DRY_GRASS ||
+                                      cell.type === terrainType.FOREST;
+
+            if (isWorkableTerrain) {
+                const baseHeight = generationSettings.waterLevel;
+                if (cell.heightValue > baseHeight + TERRACE_STEP) {
+                    if (cell.type === terrainType.FOREST) {
+                        cell.type = terrainType.FOREST_HIGHLAND;
+                    } else {
+                        cell.type = terrainType.GRASS_HIGHLAND;
+                    }
+                }
+
+                let max_diff = 0;
+                if (y < height - 1) max_diff = Math.max(max_diff, Math.abs(cell.heightValue - newMap[y+1][x].heightValue));
+                if (x < width - 1) max_diff = Math.max(max_diff, Math.abs(cell.heightValue - newMap[y][x+1].heightValue));
+                if (y > 0) max_diff = Math.max(max_diff, Math.abs(cell.heightValue - newMap[y-1][x].heightValue));
+                if (x > 0) max_diff = Math.max(max_diff, Math.abs(cell.heightValue - newMap[y][x-1].heightValue));
+
+                if (max_diff > CLIFF_THRESHOLD) {
+                    cell.type = terrainType.STONE_CLIFF;
+                }
+            }
+        }
+    }
+  
+    generateRivers(newMap, width, height, noise);
+  
+    physmap = newMap;
+  
+    recalculatePhysmapColors(palette);
+
+    politicalMap = null; 
 }
 
 export function generateAndStorePoliticalMap() {
@@ -514,4 +834,4 @@ export function setMapPreset(preset) {
     currentMapPreset = preset;
 }
 
-export { terrainType };
+export { terrainType, TERRAIN_HEIGHT_MAP };

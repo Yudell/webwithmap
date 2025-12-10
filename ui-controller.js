@@ -1,4 +1,4 @@
-let politicalLayerButton, settlementsLayerButton, poiLayerButton, loadingOverlay;
+let politicalLayerButton, settlementsLayerButton, poiLayerButton, loadingOverlay, view3dButton;
 
 export function showLoading() {
     if (loadingOverlay) loadingOverlay.style.display = 'flex';
@@ -12,7 +12,7 @@ export function updateGenerationScaleDisplay(scale) {
     document.getElementById('scale-display').textContent = `${Math.round(scale * 100)}%`;
 }
 
-export function updateLayerButtonsState(isPoliticalMapVisible, isSettlementsLayerVisible, isPoiLayerVisible, hasPoliticalData, hasMap) {
+export function updateLayerButtonsState(isPoliticalMapVisible, isSettlementsLayerVisible, isPoiLayerVisible, is3dViewEnabled, hasPoliticalData, hasMap) {
     const setButtonState = (button, isVisible, visibleText, hiddenText) => {
         if (button) {
             button.style.display = hasMap ? 'inline-block' : 'none';
@@ -22,6 +22,11 @@ export function updateLayerButtonsState(isPoliticalMapVisible, isSettlementsLaye
     setButtonState(politicalLayerButton, isPoliticalMapVisible, 'Show Politics', 'Hide Politics');
     setButtonState(settlementsLayerButton, isSettlementsLayerVisible, 'Show Settlements', 'Hide Settlements');
     setButtonState(poiLayerButton, isPoiLayerVisible, 'Show POI', 'Hide POI');
+    
+    if (view3dButton) {
+        view3dButton.style.display = hasMap ? 'inline-block' : 'none';
+        view3dButton.textContent = is3dViewEnabled ? 'Disable 3D View' : 'Enable 3D View';
+    }
 }
 
 
@@ -29,6 +34,7 @@ export function initializeUI(callbacks) {
     politicalLayerButton = document.getElementById('toggle-political-layer');
     settlementsLayerButton = document.getElementById('toggle-settlements-layer');
     poiLayerButton = document.getElementById('toggle-poi-layer');
+    view3dButton = document.getElementById('toggle-3d-view');
     loadingOverlay = document.getElementById('loading-overlay');
     const canvas = document.getElementById('map-canvas');
 
@@ -45,6 +51,7 @@ export function initializeUI(callbacks) {
     politicalLayerButton.addEventListener('click', () => callbacks.onLayerToggle('political'));
     settlementsLayerButton.addEventListener('click', () => callbacks.onLayerToggle('settlements'));
     poiLayerButton.addEventListener('click', () => callbacks.onLayerToggle('poi'));
+    view3dButton.addEventListener('click', callbacks.onToggle3dView);
     
     const presetButtons = document.querySelectorAll('.preset-button');
     presetButtons.forEach(button => {

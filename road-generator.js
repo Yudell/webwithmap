@@ -336,23 +336,59 @@ export function generateRoadNetwork(physmap, politicalMap, seeds, width, height)
         });
     });
 
-    if (majorSettlements.length < 2) {
-        console.timeEnd("Total road generation");
-        return []; 
-    }
-    
-    const roadConnections = buildRoadNetworkMST(majorSettlements);
-
-    for (const connection of roadConnections) {
-        const path = findFullPath(connection.start, connection.end, costMap, width, height);
-        if (path) {
-            allPaths.push(path);
-            
-            for (const point of path) {
-                costMap[point.y][point.x] = ROAD_COST;
+    if (majorSettlements.length >= 2) {
+        const roadConnections = buildRoadNetworkMST(majorSettlements);
+        for (const connection of roadConnections) {
+            const path = findFullPath(connection.start, connection.end, costMap, width, height);
+            if (path) {
+                allPaths.push(path);
+                for (const point of path) {
+                    costMap[point.y][point.x] = ROAD_COST;
+                }
             }
         }
     }
+
+    politicalMap.nations.forEach(nation => {
+        const nationMajorSettlements = [];
+        if (nation.capital) {
+            nationMajorSettlements.push(nation.capital);
+        }
+        nation.settlements?.forEach(s => {
+            if (s.type === 'city') {
+                nationMajorSettlements.push(s);
+            }
+        });
+
+        const nationVillages = nation.settlements?.filter(s => s.type === 'village') || [];
+
+        if (nationMajorSettlements.length === 0 || nationVillages.length === 0) {
+            return;
+        }
+
+        nationVillages.forEach(village => {
+            let closestMajor = null;
+            let minDistanceSq = Infinity;
+
+            nationMajorSettlements.forEach(major => {
+                const distSq = (village.x - major.x)**2 + (village.y - major.y)**2;
+                if (distSq < minDistanceSq) {
+                    minDistanceSq = distSq;
+                    closestMajor = major;
+                }
+            });
+            
+            if (closestMajor) {
+                const path = findFullPath(village, closestMajor, costMap, width, height);
+                if (path) {
+                    allPaths.push(path);
+                    for (const point of path) {
+                        costMap[point.y][point.x] = ROAD_COST;
+                    }
+                }
+            }
+        });
+    });
     
     console.timeEnd("Total road generation");
     return allPaths;

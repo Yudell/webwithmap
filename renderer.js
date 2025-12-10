@@ -1,4 +1,4 @@
-import { getPhysmap, getPoliticalMap, getCellSize, getRiverNetwork } from './map-data.js';
+import { getPhysmap, getPoliticalMap, getCellSize, getRiverNetwork, TERRAIN_HEIGHT_MAP } from './map-data.js';
 import * as camera from './camera.js';
 import { terrainType } from './terrain-types.js';
 
@@ -64,14 +64,15 @@ function ensureCacheCanvases(width, height) {
     });
 }
 
-function updateTerrainCache(physmap, cachePixelSize) {
+function updateTerrainCache(physmap, cachePixelSize, is3dViewEnabled) {
     if (!isTerrainCacheDirty || !physmap) return;
     const cacheCtx = terrainCache.getContext('2d');
     cacheCtx.imageSmoothingEnabled = false;
     cacheCtx.clearRect(0, 0, terrainCache.width, terrainCache.height);
     drawCompleteMap(cacheCtx, physmap, null, null, {
         cellSize: cachePixelSize,
-        drawBaseTerrain: true
+        drawBaseTerrain: true,
+        draw3dEdges: is3dViewEnabled
     });
     isTerrainCacheDirty = false;
 }
@@ -130,7 +131,7 @@ function updateSettlementsCache(politicalData, cachePixelSize) {
 }
 
 
-function ensureCachesAreUpdated() {
+function ensureCachesAreUpdated(is3dViewEnabled) {
     const physmap = getPhysmap();
     if (!physmap || !physmap[0]) return;
     const mapDataHeight = physmap.length;
@@ -138,14 +139,14 @@ function ensureCachesAreUpdated() {
     const CACHE_PIXEL_SIZE = 3;
     ensureCacheCanvases(mapDataWidth * CACHE_PIXEL_SIZE, mapDataHeight * CACHE_PIXEL_SIZE);
     const politicalData = getPoliticalMap();
-    updateTerrainCache(physmap, CACHE_PIXEL_SIZE);
+    updateTerrainCache(physmap, CACHE_PIXEL_SIZE, is3dViewEnabled);
     updateRiverCache(CACHE_PIXEL_SIZE);
     updatePoliticalCache(physmap, politicalData, CACHE_PIXEL_SIZE);
     updateSettlementsCache(politicalData, CACHE_PIXEL_SIZE);
 }
 
-function drawFrame(isPoliticalMapVisible, isSettlementsLayerVisible, isPoiLayerVisible) {
-    ensureCachesAreUpdated();
+function drawFrame(isPoliticalMapVisible, isSettlementsLayerVisible, isPoiLayerVisible, is3dViewEnabled) {
+    ensureCachesAreUpdated(is3dViewEnabled);
     const currentPhysmap = getPhysmap();
     const currentCellSize = getCellSize();
     if (!currentPhysmap || !currentPhysmap[0] || !ctx) return;
@@ -182,9 +183,10 @@ export function startRenderLoop(getState) {
         const {
             isPoliticalMapVisible,
             isSettlementsLayerVisible,
-            isPoiLayerVisible
+            isPoiLayerVisible,
+            is3dViewEnabled
         } = getState();
-        drawFrame(isPoliticalMapVisible, isSettlementsLayerVisible, isPoiLayerVisible);
+        drawFrame(isPoliticalMapVisible, isSettlementsLayerVisible, isPoiLayerVisible, is3dViewEnabled);
         requestAnimationFrame(loop);
     };
     loop();
@@ -194,6 +196,7 @@ export function drawCompleteMap(targetCtx, physmap, politicalData, riverNetwork 
     const {
         cellSize,
         drawBaseTerrain = false,
+        draw3dEdges = false,
         drawPoliticalLayer = false,
         drawRivers = false,
         drawRoads = false,
@@ -206,6 +209,56 @@ export function drawCompleteMap(targetCtx, physmap, politicalData, riverNetwork 
                 if (physmap[y] && physmap[y][x]) {
                     targetCtx.fillStyle = physmap[y][x].color;
                     targetCtx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+                }
+            }
+        }
+        
+        if (draw3dEdges) {
+            const mapHeight = physmap.length;
+            const mapWidth = physmap[0].length;
+            const highlightColor = 'rgba(255, 255, 255, 0.2)';
+            const shadowColor = 'rgba(0, 0, 0, 0.2)';
+            const lineWidth = Math.max(1, Math.floor(cellSize * 0.3));
+
+            for (let y = 0; y < mapHeight; y++) {
+                for (let x = 0; x < mapWidth; x++) {
+                    const currentCell = physmap[y][x];
+                    const isWater = currentCell.type === terrainType.OCEAN || currentCell.type === terrainType.SEA || currentCell.type === terrainType.SHALLOW_WATER;
+                    if (isWater) {
+                        continue;
+                    }
+
+                    const currentHeight = TERRAIN_HEIGHT_MAP[physmap[y][x].type] ?? 0;
+                    
+                    if (y < mapHeight - 1) {
+                        const bottomHeight = TERRAIN_HEIGHT_MAP[physmap[y + 1][x].type] ?? 0;
+                        if (currentHeight > bottomHeight) {
+                            targetCtx.fillStyle = shadowColor;
+                            targetCtx.fillRect(x * cellSize, (y + 1) * cellSize - lineWidth, cellSize, lineWidth);
+                        }
+                    }
+                    if (x < mapWidth - 1) {
+                        const rightHeight = TERRAIN_HEIGHT_MAP[physmap[y][x + 1].type] ?? 0;
+                         if (currentHeight > rightHeight) {
+                            targetCtx.fillStyle = shadowColor;
+                            targetCtx.fillRect((x + 1) * cellSize - lineWidth, y * cellSize, lineWidth, cellSize);
+                        }
+                    }
+                    
+                    if (y > 0) {
+                        const topHeight = TERRAIN_HEIGHT_MAP[physmap[y - 1][x].type] ?? 0;
+                        if (currentHeight > topHeight) {
+                            targetCtx.fillStyle = highlightColor;
+                            targetCtx.fillRect(x * cellSize, y * cellSize, cellSize, lineWidth);
+                        }
+                    }
+                    if (x > 0) {
+                        const leftHeight = TERRAIN_HEIGHT_MAP[physmap[y][x - 1].type] ?? 0;
+                        if (currentHeight > leftHeight) {
+                            targetCtx.fillStyle = highlightColor;
+                            targetCtx.fillRect(x * cellSize, y * cellSize, lineWidth, cellSize);
+                        }
+                    }
                 }
             }
         }
@@ -251,7 +304,7 @@ export function drawCompleteMap(targetCtx, physmap, politicalData, riverNetwork 
         for (let y = 0; y < physmap.length; y++) {
             for (let x = 0; x < physmap[0].length; x++) {
                 const physCell = physmap[y] && physmap[y][x];
-                if (physCell && physCell.type !== terrainType.OCEAN && physCell.type !== terrainType.SEA && physCell.type !== terrainType.RIVER) {
+                if (physCell && physCell.type !== terrainType.OCEAN && physCell.type !== terrainType.SEA && physCell.type !== terrainType.RIVER && physCell.type !== terrainType.SHALLOW_WATER) {
                     const politicalCell = politicalGrid[y] && politicalGrid[y][x];
                     if (politicalCell && typeof politicalCell.nationId === 'number') {
                         const nation = localNationLookup.get(politicalCell.nationId);
@@ -293,6 +346,41 @@ export function drawCompleteMap(targetCtx, physmap, politicalData, riverNetwork 
                 targetCtx.lineTo(path[i].x * cellSize + cellSize / 2, path[i].y * cellSize + cellSize / 2);
             }
             targetCtx.stroke();
+        });
+    }
+
+        // --- ВСТАВИТЬ В renderer.js внутри drawCompleteMap ---
+
+    if (drawRivers && riverNetwork) {
+        targetCtx.strokeStyle = '#4fa4d6'; 
+        targetCtx.lineCap = 'round';
+        targetCtx.lineJoin = 'round';
+    
+        riverNetwork.forEach(path => {
+            if (path.length < 2) return;
+        
+            for (let i = 0; i < path.length - 1; i++) {
+                const p0 = path[i];
+                const p1 = path[i + 1];
+            
+                targetCtx.beginPath();
+                
+                // Защита, если flux не рассчитан (старые данные)
+                const fluxVal = p0.flux || 10; 
+                
+                // Толщина
+                const width = Math.min(cellSize * 0.8, Math.max(cellSize * 0.2, Math.sqrt(fluxVal) * 0.05 * cellSize));
+                targetCtx.lineWidth = width;
+            
+                const x0 = p0.x * cellSize + cellSize / 2;
+                const y0 = p0.y * cellSize + cellSize / 2;
+                const x1 = p1.x * cellSize + cellSize / 2;
+                const y1 = p1.y * cellSize + cellSize / 2;
+                
+                targetCtx.moveTo(x0, y0);
+                targetCtx.lineTo(x1, y1);
+                targetCtx.stroke();
+            }
         });
     }
 
@@ -338,6 +426,10 @@ function drawDynamicElements(politicalData, viewScale, currentCellSize, isPoliti
     ctx.textBaseline = 'middle';
     const originalFontForMeasurement = ctx.font;
     const HIDE_NAMES_ZOOM_THRESHOLD = 2.5;
+
+    const currentPhysmap = getPhysmap();
+    const mapTotalWorldWidth = currentPhysmap[0].length * currentCellSize;
+    const mapTotalWorldHeight = currentPhysmap.length * currentCellSize;
 
     if (isSettlementsLayerVisible) {
         politicalData.nations.forEach(nation => {
@@ -392,12 +484,40 @@ function drawDynamicElements(politicalData, viewScale, currentCellSize, isPoliti
                 finalFontSizeInWorldUnits = Math.max(finalFontSizeInWorldUnits, currentCellSize * 0.3);
                 finalFontSizeInWorldUnits = Math.min(finalFontSizeInWorldUnits, currentCellSize * 20);
                 ctx.font = `${finalFontSizeInWorldUnits}px 'Cinzel', sans-serif`;
+
+                const textMetrics = ctx.measureText(nation.name);
+                const textWidth = textMetrics.width;
+                const textHeight = finalFontSizeInWorldUnits;
+                const halfWidth = textWidth / 2;
+                const halfHeight = textHeight / 2;
+
+                const textLeft = labelWorldX - halfWidth;
+                const textRight = labelWorldX + halfWidth;
+                const textTop = labelWorldY - halfHeight;
+                const textBottom = labelWorldY + halfHeight;
+
+                let finalLabelX = labelWorldX;
+                let finalLabelY = labelWorldY;
+
+                if (textLeft < 0) {
+                    finalLabelX -= textLeft;
+                }
+                if (textRight > mapTotalWorldWidth) {
+                    finalLabelX -= (textRight - mapTotalWorldWidth);
+                }
+                if (textTop < 0) {
+                    finalLabelY -= textTop;
+                }
+                if (textBottom > mapTotalWorldHeight) {
+                    finalLabelY -= (textBottom - mapTotalWorldHeight);
+                }
+                
                 const outlineWidthInWorld = Math.max(0.05 * finalFontSizeInWorldUnits, finalFontSizeInWorldUnits * 0.08);
                 ctx.lineWidth = outlineWidthInWorld;
                 ctx.strokeStyle = 'black';
-                ctx.strokeText(nation.name, labelWorldX, labelWorldY);
+                ctx.strokeText(nation.name, finalLabelX, finalLabelY);
                 ctx.fillStyle = 'white';
-                ctx.fillText(nation.name, labelWorldX, labelWorldY);
+                ctx.fillText(nation.name, finalLabelX, finalLabelY);
             }
         });
     }
