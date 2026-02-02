@@ -1,4 +1,8 @@
 let politicalLayerButton, settlementsLayerButton, poiLayerButton, loadingOverlay, view3dButton;
+let isPanning = false;
+let isDrawing = false;
+let hasMoved = false;
+let lastPanX, lastPanY;
 
 export function showLoading() {
     if (loadingOverlay) loadingOverlay.style.display = 'flex';
@@ -28,7 +32,6 @@ export function updateLayerButtonsState(isPoliticalMapVisible, isSettlementsLaye
         view3dButton.textContent = is3dViewEnabled ? 'Disable 3D View' : 'Enable 3D View';
     }
 }
-
 
 export function initializeUI(callbacks) {
     politicalLayerButton = document.getElementById('toggle-political-layer');
@@ -105,23 +108,74 @@ export function initializeUI(callbacks) {
         settlementDensity: document.getElementById('settlement-slider').value
     });
 
-    let isPanning = false;
-    let hasMoved = false;
-    let lastPanX, lastPanY;
+
+    const editorToggleBtn = document.getElementById('toggle-editor-mode');
+    if (editorToggleBtn) {
+        editorToggleBtn.addEventListener('click', () => {
+            if (callbacks.onToggleEditor) callbacks.onToggleEditor();
+        });
+    }
+
+    const brushSizeInput = document.getElementById('brush-size');
+    if (brushSizeInput) {
+        brushSizeInput.addEventListener('input', (e) => {
+            const val = e.target.value;
+            document.getElementById('brush-size-display').textContent = val;
+            if (callbacks.onBrushSizeChange) callbacks.onBrushSizeChange(val);
+        });
+    }
+
+    const recalcWorldBtn = document.getElementById('recalc-world');
+    if (recalcWorldBtn) {
+        recalcWorldBtn.addEventListener('click', () => {
+            if (callbacks.onRecalcWorld) callbacks.onRecalcWorld();
+        });
+    }
+
+    const brushButtons = document.querySelectorAll('.brush-btn');
+    brushButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            brushButtons.forEach(b => b.classList.remove('active-brush'));
+            btn.classList.add('active-brush');
+            if (callbacks.onBrushTypeChange) callbacks.onBrushTypeChange(btn.dataset.type);
+        });
+    });
+
 
     canvas.addEventListener('wheel', (e) => callbacks.onZoom(e, canvas), { passive: false });
-    canvas.addEventListener('click', (e) => { if (!hasMoved) callbacks.onMapClick(e, canvas); });
+    
+    canvas.addEventListener('click', (e) => { 
+        if (!hasMoved && (!callbacks.isEditorMode || !callbacks.isEditorMode())) {
+            callbacks.onMapClick(e, canvas); 
+        }
+    });
 
     window.addEventListener('mousedown', (e) => {
-        if (e.button !== 0 || e.target.closest('#nation-info-popup') || e.target !== canvas) return;
-        isPanning = true;
-        hasMoved = false;
-        lastPanX = e.clientX;
-        lastPanY = e.clientY;
-        canvas.style.cursor = 'grabbing';
+        if (e.target !== canvas || e.target.closest('#nation-info-popup')) return;
+
+        if (callbacks.isEditorMode && callbacks.isEditorMode()) {
+            if (e.button === 0) {
+                isDrawing = true;
+                if (callbacks.onEditorDraw) callbacks.onEditorDraw(e);
+                return; 
+            }
+        }
+
+        if (e.button === 0) {
+            isPanning = true;
+            hasMoved = false;
+            lastPanX = e.clientX;
+            lastPanY = e.clientY;
+            canvas.style.cursor = 'grabbing';
+        }
     });
 
     window.addEventListener('mousemove', (e) => {
+        if (isDrawing && callbacks.isEditorMode && callbacks.isEditorMode()) {
+            if (callbacks.onEditorDraw) callbacks.onEditorDraw(e);
+            return;
+        }
+
         if (!isPanning) return;
         const dx = e.clientX - lastPanX;
         const dy = e.clientY - lastPanY;
@@ -132,6 +186,9 @@ export function initializeUI(callbacks) {
     });
 
     window.addEventListener('mouseup', () => {
+        if (isDrawing) {
+            isDrawing = false;
+        }
         if (isPanning) {
             isPanning = false;
             canvas.style.cursor = 'grab';

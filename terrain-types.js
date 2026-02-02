@@ -1,7 +1,7 @@
 export const terrainType = {
   OCEAN: 'OCEAN',
   SEA: 'SEA',
-  SHALLOW_WATER: 'SHALLOW_WATER', // <<< НОВЫЙ ТИП
+  SHALLOW_WATER: 'SHALLOW_WATER',
   RIVER: 'RIVER',
   WET_SAND: 'WET_SAND',
   SAND: 'SAND',

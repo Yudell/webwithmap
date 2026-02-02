@@ -3,7 +3,8 @@ import {
   setGenerationScale, MIN_GENERATION_SCALE, MAX_GENERATION_SCALE,
   GENERATION_SCALE_STEP, generateAndStorePoliticalMap, getPoliticalMap,
   getCurrentMapSeeds, updateGenerationSettings, setMapPreset, getRiverNetwork,
-  recalculatePhysmapColors
+  recalculatePhysmapColors,
+  applyTerrainBrush, recalculateColorsInRect 
 } from './map-data.js';
 import * as renderer from './renderer.js';
 import * as camera from './camera.js';
@@ -16,6 +17,10 @@ let isPoiLayerVisible = false;
 let is3dViewEnabled = true;
 let currentPalette = 'default';
 let nationLookup = null;
+
+let isEditorMode = false;
+let currentBrushType = 'OCEAN';
+let currentBrushSize = 3;
 
 function getSeedFromURL() {
     const params = new URLSearchParams(window.location.search);
@@ -110,6 +115,24 @@ function handlePaletteChange(newPalette) {
     recalculatePhysmapColors(newPalette);
 
     renderer.markAllCachesDirty();
+}
+
+function handleEditorDraw(e) {
+    if (!isEditorMode) return;
+    const canvas = document.getElementById('map-canvas');
+    if (!canvas) return;
+    
+    const { worldX, worldY } = camera.screenToWorld(e.clientX, e.clientY, canvas);
+    const cellSize = getCellSize();
+    const gridX = Math.floor(worldX / cellSize);
+    const gridY = Math.floor(worldY / cellSize);
+
+    const dirtyRect = applyTerrainBrush(gridX, gridY, currentBrushSize, currentBrushType);
+    
+    if (dirtyRect) {
+        recalculateColorsInRect(dirtyRect, currentPalette);
+        renderer.updateTerrainPart(dirtyRect);
+    }
 }
 
 
@@ -237,7 +260,35 @@ const callbacks = {
         if (typeof clickedNationId === 'number' && !isPopupOpenForNation(clickedNationId)) {
             showInfoPopup(nationLookup.get(clickedNationId), event);
         }
-    }
+    },
+    
+    onToggleEditor: () => {
+        isEditorMode = !isEditorMode;
+        
+        const tools = document.getElementById('editor-tools');
+        const btn = document.getElementById('toggle-editor-mode');
+        if (tools) tools.style.display = isEditorMode ? 'block' : 'none';
+        if (btn) btn.textContent = isEditorMode ? 'Disable Edit Mode' : 'Enable Edit Mode';
+        
+        if (isEditorMode) {
+            isPoliticalMapVisible = false;
+            isSettlementsLayerVisible = false;
+            isPoiLayerVisible = false;
+            hideInfoPopup();
+        }
+        fullStateUpdate();
+    },
+    onBrushSizeChange: (val) => {
+        currentBrushSize = parseInt(val, 10);
+    },
+    onBrushTypeChange: (type) => {
+        currentBrushType = type;
+    },
+    onRecalcWorld: () => {
+        regeneratePoliticalLayerViewOnly();
+    },
+    isEditorMode: () => isEditorMode,
+    onEditorDraw: handleEditorDraw
 };
 
 document.addEventListener('DOMContentLoaded', () => {

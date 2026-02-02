@@ -77,6 +77,23 @@ function updateTerrainCache(physmap, cachePixelSize, is3dViewEnabled) {
     isTerrainCacheDirty = false;
 }
 
+export function updateTerrainPart(rect) {
+    if (!terrainCache || !getPhysmap()) return;
+    
+    const physmap = getPhysmap();
+    const cellSize = 3;
+    const is3d = true;
+
+    const cacheCtx = terrainCache.getContext('2d');
+    
+    drawCompleteMap(cacheCtx, physmap, null, null, {
+        cellSize: cellSize,
+        drawBaseTerrain: true,
+        draw3dEdges: is3d, 
+        bounds: rect 
+    });
+}
+
 function updateRiverCache(cachePixelSize) {
     if (!isRiverCacheDirty) return;
     const cacheCtx = riverCache.getContext('2d');
@@ -200,12 +217,26 @@ export function drawCompleteMap(targetCtx, physmap, politicalData, riverNetwork 
         drawPoliticalLayer = false,
         drawRivers = false,
         drawRoads = false,
-        drawNationNames = false
+        drawNationNames = false,
+        bounds = null 
     } = settings;
 
+    const startY = bounds ? bounds.minY : 0;
+    const endY = bounds && physmap ? Math.min(bounds.maxY, physmap.length - 1) : (physmap ? physmap.length - 1 : 0);
+    const startX = bounds ? bounds.minX : 0;
+    const endX = bounds && physmap ? Math.min(bounds.maxX, physmap[0].length - 1) : (physmap ? physmap[0].length - 1 : 0);
+
+    if (bounds) {
+        const clearX = startX * cellSize;
+        const clearY = startY * cellSize;
+        const clearW = (endX - startX + 1) * cellSize;
+        const clearH = (endY - startY + 1) * cellSize;
+        targetCtx.clearRect(clearX, clearY, clearW, clearH);
+    }
+
     if (drawBaseTerrain && physmap) {
-        for (let y = 0; y < physmap.length; y++) {
-            for (let x = 0; x < physmap[0].length; x++) {
+        for (let y = startY; y <= endY; y++) {
+            for (let x = startX; x <= endX; x++) {
                 if (physmap[y] && physmap[y][x]) {
                     targetCtx.fillStyle = physmap[y][x].color;
                     targetCtx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
@@ -220,8 +251,8 @@ export function drawCompleteMap(targetCtx, physmap, politicalData, riverNetwork 
             const shadowColor = 'rgba(0, 0, 0, 0.2)';
             const lineWidth = Math.max(1, Math.floor(cellSize * 0.3));
 
-            for (let y = 0; y < mapHeight; y++) {
-                for (let x = 0; x < mapWidth; x++) {
+            for (let y = startY; y <= endY; y++) {
+                for (let x = startX; x <= endX; x++) {
                     const currentCell = physmap[y][x];
                     const isWater = currentCell.type === terrainType.OCEAN || currentCell.type === terrainType.SEA || currentCell.type === terrainType.SHALLOW_WATER;
                     if (isWater) {
@@ -265,33 +296,30 @@ export function drawCompleteMap(targetCtx, physmap, politicalData, riverNetwork 
     }
     
     if (drawRivers && riverNetwork) {
-        targetCtx.strokeStyle = 'oklch(55% 0.15 215)';
+        targetCtx.strokeStyle = '#4fa4d6';
         targetCtx.lineCap = 'round';
         targetCtx.lineJoin = 'round';
 
         riverNetwork.forEach(path => {
             if (path.length < 2) return;
 
+
             for (let i = 0; i < path.length - 1; i++) {
-                const startPoint = path[i];
-                const endPoint = path[i + 1];
-                const progress = (i + 1) / path.length;
-
-                const minWidth = 0.2 * cellSize;
-                const maxWidth = 1.2 * cellSize;
+                const p0 = path[i];
+                const p1 = path[i + 1];
                 
-                const width = minWidth + (Math.sqrt(progress) * (maxWidth - minWidth));
-                targetCtx.lineWidth = width;
-
                 targetCtx.beginPath();
-                targetCtx.moveTo(
-                    startPoint.x * cellSize + cellSize / 2, 
-                    startPoint.y * cellSize + cellSize / 2
-                );
-                targetCtx.lineTo(
-                    endPoint.x * cellSize + cellSize / 2, 
-                    endPoint.y * cellSize + cellSize / 2
-                );
+                const fluxVal = p0.flux || 10; 
+                const width = Math.min(cellSize * 0.8, Math.max(cellSize * 0.2, Math.sqrt(fluxVal) * 0.05 * cellSize));
+                targetCtx.lineWidth = width;
+            
+                const x0 = p0.x * cellSize + cellSize / 2;
+                const y0 = p0.y * cellSize + cellSize / 2;
+                const x1 = p1.x * cellSize + cellSize / 2;
+                const y1 = p1.y * cellSize + cellSize / 2;
+                
+                targetCtx.moveTo(x0, y0);
+                targetCtx.lineTo(x1, y1);
                 targetCtx.stroke();
             }
         });
@@ -301,8 +329,8 @@ export function drawCompleteMap(targetCtx, physmap, politicalData, riverNetwork 
     const localNationLookup = politicalData ? new Map(politicalData.nations.map(n => [n.id, n])) : null;
 
     if (drawPoliticalLayer && politicalData && physmap && politicalGrid) {
-        for (let y = 0; y < physmap.length; y++) {
-            for (let x = 0; x < physmap[0].length; x++) {
+        for (let y = startY; y <= endY; y++) {
+            for (let x = startX; x <= endX; x++) {
                 const physCell = physmap[y] && physmap[y][x];
                 if (physCell && physCell.type !== terrainType.OCEAN && physCell.type !== terrainType.SEA && physCell.type !== terrainType.RIVER && physCell.type !== terrainType.SHALLOW_WATER) {
                     const politicalCell = politicalGrid[y] && politicalGrid[y][x];
@@ -318,8 +346,8 @@ export function drawCompleteMap(targetCtx, physmap, politicalData, riverNetwork 
         }
         targetCtx.fillStyle = '#000000';
         const lineWidth = 1;
-        for (let y = 0; y < politicalGrid.length; y++) {
-            for (let x = 0; x < politicalGrid[0].length; x++) {
+        for (let y = startY; y <= endY; y++) {
+            for (let x = startX; x <= endX; x++) {
                 const politicalCell = politicalGrid[y] && politicalGrid[y][x];
                 if (politicalCell && politicalCell.borders) {
                     const cellDrawX = x * cellSize;
@@ -346,41 +374,6 @@ export function drawCompleteMap(targetCtx, physmap, politicalData, riverNetwork 
                 targetCtx.lineTo(path[i].x * cellSize + cellSize / 2, path[i].y * cellSize + cellSize / 2);
             }
             targetCtx.stroke();
-        });
-    }
-
-        // --- ВСТАВИТЬ В renderer.js внутри drawCompleteMap ---
-
-    if (drawRivers && riverNetwork) {
-        targetCtx.strokeStyle = '#4fa4d6'; 
-        targetCtx.lineCap = 'round';
-        targetCtx.lineJoin = 'round';
-    
-        riverNetwork.forEach(path => {
-            if (path.length < 2) return;
-        
-            for (let i = 0; i < path.length - 1; i++) {
-                const p0 = path[i];
-                const p1 = path[i + 1];
-            
-                targetCtx.beginPath();
-                
-                // Защита, если flux не рассчитан (старые данные)
-                const fluxVal = p0.flux || 10; 
-                
-                // Толщина
-                const width = Math.min(cellSize * 0.8, Math.max(cellSize * 0.2, Math.sqrt(fluxVal) * 0.05 * cellSize));
-                targetCtx.lineWidth = width;
-            
-                const x0 = p0.x * cellSize + cellSize / 2;
-                const y0 = p0.y * cellSize + cellSize / 2;
-                const x1 = p1.x * cellSize + cellSize / 2;
-                const y1 = p1.y * cellSize + cellSize / 2;
-                
-                targetCtx.moveTo(x0, y0);
-                targetCtx.lineTo(x1, y1);
-                targetCtx.stroke();
-            }
         });
     }
 

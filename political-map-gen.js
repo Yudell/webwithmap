@@ -68,7 +68,6 @@ class MinHeap {
 function findBestLabelPosition(nationId, nationMap, mapWidth, mapHeight) {
     const dist = Array.from({ length: mapHeight }, () => new Array(mapWidth).fill(0));
 
-    // Initialize distances: 0 for borders/outside, Infinity for inside
     for (let y = 0; y < mapHeight; y++) {
         for (let x = 0; x < mapWidth; x++) {
             if (nationMap[y][x].nationId === nationId) {
@@ -77,20 +76,18 @@ function findBestLabelPosition(nationId, nationMap, mapWidth, mapHeight) {
         }
     }
 
-    // Pass 1: Top-left to bottom-right (calculates distance to nearest top or left border)
     for (let y = 0; y < mapHeight; y++) {
         for (let x = 0; x < mapWidth; x++) {
             if (dist[y][x] !== 0) {
                 let minDist = Infinity;
                 if (y > 0) minDist = Math.min(minDist, dist[y - 1][x] + 1);
                 if (x > 0) minDist = Math.min(minDist, dist[y][x - 1] + 1);
-                if (y > 0 && x > 0) minDist = Math.min(minDist, dist[y-1][x-1] + 1.414); // Diagonal
+                if (y > 0 && x > 0) minDist = Math.min(minDist, dist[y-1][x-1] + 1.414);
                 dist[y][x] = Math.min(dist[y][x], minDist);
             }
         }
     }
 
-    // Pass 2: Bottom-right to top-left (calculates distance to nearest bottom or right border)
     let maxDist = 0;
     for (let y = mapHeight - 1; y >= 0; y--) {
         for (let x = mapWidth - 1; x >= 0; x--) {
@@ -98,39 +95,33 @@ function findBestLabelPosition(nationId, nationMap, mapWidth, mapHeight) {
                 let minDist = Infinity;
                 if (y < mapHeight - 1) minDist = Math.min(minDist, dist[y + 1][x] + 1);
                 if (x < mapWidth - 1) minDist = Math.min(minDist, dist[y][x + 1] + 1);
-                if (y < mapHeight - 1 && x < mapWidth - 1) minDist = Math.min(minDist, dist[y+1][x+1] + 1.414); // Diagonal
+                if (y < mapHeight - 1 && x < mapWidth - 1) minDist = Math.min(minDist, dist[y+1][x+1] + 1.414);
                 dist[y][x] = Math.min(dist[y][x], minDist);
                 if (dist[y][x] > maxDist) maxDist = dist[y][x];
             }
         }
     }
     
-    // Find the point with the best score, penalizing edges of the map
     let bestScore = -1;
     let bestPos = { x: -1, y: -1 };
     
-    // The margin from the edge where the penalty starts to apply (e.g., 15% of the map width)
     const margin = Math.min(mapWidth, mapHeight) * 0.15;
 
     for (let y = 0; y < mapHeight; y++) {
         for (let x = 0; x < mapWidth; x++) {
             if (nationMap[y][x].nationId === nationId) {
-                // Distance from this point to the closest nation border
                 const internalDistance = dist[y][x];
 
-                // Calculate a weight based on distance from the map edges.
-                // Weight is 1.0 inside the margin, and drops to 0 at the edge.
+       
                 const distToEdgeX = Math.min(x, mapWidth - 1 - x);
                 const distToEdgeY = Math.min(y, mapHeight - 1 - y);
                 
                 const weightX = Math.min(1.0, distToEdgeX / margin);
                 const weightY = Math.min(1.0, distToEdgeY / margin);
                 
-                // The final weight is the product of both axis weights.
-                // This creates a strong penalty for being near any edge.
+    
                 const edgeWeight = weightX * weightY;
 
-                // The score is the distance from the nation border, multiplied by the edge penalty.
                 const score = internalDistance * edgeWeight;
                 
                 if (score > bestScore) {
@@ -141,7 +132,6 @@ function findBestLabelPosition(nationId, nationMap, mapWidth, mapHeight) {
         }
     }
     
-    // Fallback in case no suitable point is found (e.g., for a 1-pixel nation)
     if (bestPos.x === -1) {
         for(let y = 0; y < mapHeight; y++) {
             for(let x = 0; x < mapWidth; x++) {

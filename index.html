@@ -51,7 +51,7 @@
         }
         
         .controls {
-            width: 320px;
+            width:100%;
             background: rgba(0, 0, 0, 0.8);
             border-radius: 5px;
             font-family: 'Cinzel', serif;
@@ -205,6 +205,36 @@
             background: #555;
             border-color: #888;
         }
+
+        .brush-btn {
+            width: 32px;
+            height: 32px;
+            border: 2px solid #444;
+            border-radius: 4px;
+            margin: 1px;
+            font-size: 14px;
+            background: #333;
+            color: #fff;
+            cursor: pointer;
+            flex-grow: 0 !important;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-shadow: 0 1px 2px black;
+            transition: transform 0.1s, border-color 0.1s;
+        }
+
+        .brush-btn:hover {
+            border-color: #888;
+        }
+
+        .brush-btn.active-brush {
+            border-color: white !important;
+            transform: scale(1.15);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.8);
+            z-index: 5;
+        }
+
         .control-group hr {
             width: 100%;
             border: 0;
@@ -266,6 +296,7 @@
             <div class="menu-tabs">
                 <button class="menu-tab-button active-tab" data-tab-id="generation">Generation</button>
                 <button class="menu-tab-button" data-tab-id="layers">Layers</button>
+                <button class="menu-tab-button" data-tab-id="editor">Editor</button>
                 <button class="menu-tab-button" data-tab-id="save">Save</button>
             </div>
             
@@ -344,6 +375,74 @@
                     </div>
                     <div class="control-group">
                         <button id="toggle-3d-view">Disable 3D View</button>
+                    </div>
+                </div>
+
+                <!-- EDITOR PANEL -->
+                <div class="menu-content-panel" data-content-id="editor">
+                    <div class="control-group">
+                        <button id="toggle-editor-mode">Enable Edit Mode</button>
+                    </div>
+                    
+                    <div id="editor-tools" style="display: none;">
+                        <div class="control-group slider-group">
+                            <div class="label-wrapper">
+                                <label for="brush-size">Brush Size</label>
+                                <span id="brush-size-display">3</span>
+                            </div>
+                            <input type="range" id="brush-size" min="1" max="20" step="1" value="3">
+                        </div>
+                
+                        <div class="control-group">
+                            <hr>
+                            <label style="font-size: 12px; color: #aaa; width: 100%; margin-bottom: 5px;">Terrain Type</label>
+                        </div>
+                
+                        <!-- Заменить старый #brush-palette на этот расширенный -->
+                        <div class="control-group" style="gap: 2px; justify-content: center; max-height: 200px; overflow-y: auto;">
+
+                            <!-- Water Group -->
+                            <div style="display:flex; gap:2px; width:100%; justify-content: center; margin-bottom: 2px;">
+                                <button class="brush-btn active-brush" data-type="OCEAN" title="Deep Ocean" style="background: #183a8a;">🌊</button>
+                                <button class="brush-btn" data-type="SEA" title="Sea" style="background: #204daf;">🔹</button>
+                                <button class="brush-btn" data-type="SHALLOW_WATER" title="Shallow Water" style="background: #2d71d3;">💧</button>
+                                <button class="brush-btn" data-type="RIVER" title="River" style="background: #2581c2;">〰️</button>
+                            </div>
+                        
+                            <!-- Sand & Dry Group -->
+                            <div style="display:flex; gap:2px; width:100%; justify-content: center; margin-bottom: 2px;">
+                                <button class="brush-btn" data-type="WET_SAND" title="Wet Sand" style="background: #c2b88f; color: #000;">🏖️</button>
+                                <button class="brush-btn" data-type="SAND" title="Sand" style="background: #d1c9a0; color: #000;">🏜️</button>
+                                <button class="brush-btn" data-type="DRY_SAND" title="Dry Sand / Dunes" style="background: #e0d8b0; color: #000;">🐫</button>
+                            </div>
+                        
+                            <!-- Grass & Forest Group -->
+                            <div style="display:flex; gap:2px; width:100%; justify-content: center; margin-bottom: 2px;">
+                                <button class="brush-btn" data-type="WET_GRASS" title="Swamp / Wet Grass" style="background: #4a6b22;">🐊</button>
+                                <button class="brush-btn" data-type="GRASS" title="Grass" style="background: #567e2c;">🌱</button>
+                                <button class="brush-btn" data-type="DRY_GRASS" title="Dry Grass / Steppe" style="background: #8f9e4b;">🌾</button>
+                                <button class="brush-btn" data-type="FOREST" title="Forest" style="background: #35501b;">🌲</button>
+                            </div>
+                        
+                            <!-- Highlands & Cliffs -->
+                            <div style="display:flex; gap:2px; width:100%; justify-content: center; margin-bottom: 2px;">
+                                <button class="brush-btn" data-type="GRASS_HIGHLAND" title="Highlands" style="background: #6a9b3a;">⛰️</button>
+                                <button class="brush-btn" data-type="FOREST_HIGHLAND" title="Highland Forest" style="background: #456926;">🌲</button>
+                                <button class="brush-btn" data-type="STONE_CLIFF" title="Stone Cliff" style="background: #828282;">🧗</button>
+                                <button class="brush-btn" data-type="MOUNTAIN_ORE" title="Ore Mountain" style="background: #8c8e7b;">⛏️</button>
+                            </div>
+                        
+                            <!-- Mountain Group -->
+                            <div style="display:flex; gap:2px; width:100%; justify-content: center;">
+                                <button class="brush-btn" data-type="MOUNTAIN" title="Mountain" style="background: #a0a28f; color: #000;">🏔️</button>
+                                <button class="brush-btn" data-type="MOUNTAIN_SNOW" title="Snow Peak" style="background: #f5f5f5; color: #000;">❄️</button>
+                            </div>
+                        </div>
+                
+                        <div class="control-group">
+                            <hr>
+                            <button id="recalc-world" title="Recalculate rivers and borders based on new terrain">Update World Logic</button>
+                        </div>
                     </div>
                 </div>
 
